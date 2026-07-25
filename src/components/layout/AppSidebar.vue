@@ -59,6 +59,7 @@ const mainLinks = [
   { to: "/tasks", label: "Mục tiêu tuần", icon: "assignment" },
   { to: "/muc-tieu-ca-nhan", label: "Mục tiêu cá nhân", icon: "person" },
   { to: "/ke-hoach", label: "Kế hoạch ngày", icon: "calendar_month" },
+  { to: "/lich-hop", label: "Lịch họp", icon: "event" },
   { to: "/okrs", label: "OKR Management", icon: "track_changes" },
   { to: "/team", label: "Team Directory", icon: "group" }
 ];

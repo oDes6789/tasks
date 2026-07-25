@@ -46,6 +46,11 @@ const router = createRouter({
           path: "ke-hoach/:personName",
           name: "day-plan-person",
           component: () => import("@/pages/PersonDayPlanPage.vue")
+        },
+        {
+          path: "lich-hop",
+          name: "meeting-schedule",
+          component: () => import("@/pages/MeetingSchedulePage.vue")
         }
       ]
     },

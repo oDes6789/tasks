@@ -21,7 +21,16 @@ import {
   reorderDayPlans,
   updateDayPlan
 } from "./dayPlansRepo";
+import {
+  createMeeting,
+  createWeekNote,
+  deleteMeeting,
+  deleteWeekNote,
+  listMeetings,
+  updateMeeting
+} from "./meetingsRepo";
 import { resolveWeekStart } from "../src/lib/week";
+import { DEFAULT_MEETING_OWNER } from "../src/lib/meetings";
 
 dotenv.config();
 if (process.env.NODE_ENV === "production") {
@@ -642,6 +651,162 @@ app.delete("/api/day-plans/:id", async (req, res) => {
   } catch (err) {
     console.error("Failed to delete day plan:", err);
     res.status(500).json({ error: "Không xóa được mục kế hoạch." });
+  }
+});
+
+app.get("/api/meetings", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  try {
+    const board = await listMeetings(
+      req.query.owner ?? DEFAULT_MEETING_OWNER,
+      req.query.week
+    );
+    res.json(board);
+  } catch (err) {
+    console.error("Failed to load meetings:", err);
+    res.status(500).json({ error: "Không tải được lịch họp." });
+  }
+});
+
+app.post("/api/meetings", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  try {
+    const item = await createMeeting({
+      ownerKey: req.body?.ownerKey,
+      weekStart: req.body?.weekStart,
+      weekday: req.body?.weekday,
+      startMin: req.body?.startMin,
+      endMin: req.body?.endMin,
+      title: req.body?.title,
+      attendees: req.body?.attendees,
+      location: req.body?.location,
+      note: req.body?.note,
+      kind: req.body?.kind,
+      isBlock: req.body?.isBlock
+    });
+    res.status(201).json({ item });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "INVALID_WEEKDAY") {
+      return res.status(400).json({ error: "Thứ không hợp lệ." });
+    }
+    console.error("Failed to create meeting:", err);
+    res.status(500).json({ error: "Không tạo được lịch họp." });
+  }
+});
+
+app.patch("/api/meetings/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const item = await updateMeeting(id, {
+      weekStart: req.body?.weekStart,
+      weekday: req.body?.weekday,
+      startMin: req.body?.startMin,
+      endMin: req.body?.endMin,
+      title: req.body?.title,
+      attendees: req.body?.attendees,
+      location: req.body?.location,
+      note: req.body?.note,
+      kind: req.body?.kind,
+      isBlock: req.body?.isBlock
+    });
+    if (!item) {
+      return res.status(404).json({ error: "Không tìm thấy lịch họp." });
+    }
+    res.json({ item });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "INVALID_WEEKDAY") {
+      return res.status(400).json({ error: "Thứ không hợp lệ." });
+    }
+    console.error("Failed to update meeting:", err);
+    res.status(500).json({ error: "Không lưu được lịch họp." });
+  }
+});
+
+app.delete("/api/meetings/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const ok = await deleteMeeting(id);
+    if (!ok) {
+      return res.status(404).json({ error: "Không tìm thấy lịch họp." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Failed to delete meeting:", err);
+    res.status(500).json({ error: "Không xóa được lịch họp." });
+  }
+});
+
+app.post("/api/meetings/notes", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  try {
+    const note = await createWeekNote({
+      ownerKey: req.body?.ownerKey,
+      weekStart: req.body?.weekStart,
+      text: req.body?.text
+    });
+    res.status(201).json({ note });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "NOTE_REQUIRED") {
+      return res.status(400).json({ error: "Ghi chú trống." });
+    }
+    console.error("Failed to create meeting note:", err);
+    res.status(500).json({ error: "Không thêm được ghi chú." });
+  }
+});
+
+app.delete("/api/meetings/notes/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const ok = await deleteWeekNote(id);
+    if (!ok) {
+      return res.status(404).json({ error: "Không tìm thấy ghi chú." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Failed to delete meeting note:", err);
+    res.status(500).json({ error: "Không xóa được ghi chú." });
   }
 });
 

@@ -123,6 +123,37 @@ export async function migrate(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_day_plans_week_date
       ON personal_day_plans (week_start, plan_date);
+
+    CREATE TABLE IF NOT EXISTS meetings (
+      id SERIAL PRIMARY KEY,
+      owner_key TEXT NOT NULL DEFAULT 'van-anh',
+      week_start DATE NOT NULL,
+      weekday SMALLINT NOT NULL CHECK (weekday BETWEEN 2 AND 6),
+      start_min INTEGER NOT NULL,
+      end_min INTEGER NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      attendees TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'other',
+      is_block BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_meetings_owner_week
+      ON meetings (owner_key, week_start, weekday, start_min, id);
+
+    CREATE TABLE IF NOT EXISTS meeting_week_notes (
+      id SERIAL PRIMARY KEY,
+      owner_key TEXT NOT NULL DEFAULT 'van-anh',
+      week_start DATE NOT NULL,
+      text TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_meeting_notes_owner_week
+      ON meeting_week_notes (owner_key, week_start, id);
   `);
 
   for (const cat of CATEGORIES) {
