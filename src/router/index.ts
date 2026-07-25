@@ -31,6 +31,21 @@ const router = createRouter({
           path: "tasks",
           name: "tasks",
           component: () => import("@/pages/TaskBoardPage.vue")
+        },
+        {
+          path: "muc-tieu-ca-nhan",
+          name: "personal-goals",
+          component: () => import("@/pages/PersonalGoalsPage.vue")
+        },
+        {
+          path: "ke-hoach",
+          name: "day-plan",
+          component: () => import("@/pages/PersonDayPlanPage.vue")
+        },
+        {
+          path: "ke-hoach/:personName",
+          name: "day-plan-person",
+          component: () => import("@/pages/PersonDayPlanPage.vue")
         }
       ]
     },

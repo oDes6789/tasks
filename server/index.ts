@@ -8,6 +8,19 @@ import { getUserById, toPublicUser, upsertUserFromEdutalk } from "./users";
 import { migrate } from "./migrate";
 import { ensureDatabase } from "./ensureDatabase";
 import { createWeeklyTask, deleteWeeklyTask, getTaskBoard, updateWeeklyTask } from "./tasksRepo";
+import {
+  createPersonalGoal,
+  deletePersonalGoal,
+  getPersonalGoalsBoard,
+  updatePersonalGoal
+} from "./personalGoalsRepo";
+import {
+  createDayPlan,
+  deleteDayPlan,
+  getDayPlanBoard,
+  reorderDayPlans,
+  updateDayPlan
+} from "./dayPlansRepo";
 import { resolveWeekStart } from "../src/lib/week";
 
 dotenv.config();
@@ -325,6 +338,7 @@ app.post("/api/tasks", async (req, res) => {
       dod: req.body?.dod,
       pics: req.body?.pics,
       status: req.body?.status,
+      kpi: req.body?.kpi,
       progress: req.body?.progress,
       progressNote: req.body?.progressNote
     });
@@ -353,6 +367,7 @@ app.patch("/api/tasks/:id", async (req, res) => {
       dod: String(req.body?.dod ?? ""),
       pics: Array.isArray(req.body?.pics) ? req.body.pics : [],
       status: String(req.body?.status ?? "pending"),
+      kpi: String(req.body?.kpi ?? ""),
       progress: req.body?.progress == null ? null : Number(req.body.progress),
       progressNote: req.body?.progressNote == null ? null : String(req.body.progressNote)
     });
@@ -386,6 +401,247 @@ app.delete("/api/tasks/:id", async (req, res) => {
   } catch (err) {
     console.error("Failed to delete weekly task:", err);
     res.status(500).json({ error: "Không xóa được mục tiêu." });
+  }
+});
+
+app.get("/api/personal-goals", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  try {
+    const board = await getPersonalGoalsBoard(req.query.week);
+    res.json(board);
+  } catch (err) {
+    console.error("Failed to load personal goals:", err);
+    res.status(500).json({ error: "Không tải được mục tiêu cá nhân." });
+  }
+});
+
+app.post("/api/personal-goals", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const week = resolveWeekStart(req.body?.weekStart ?? req.query.week);
+
+  try {
+    const row = await createPersonalGoal({
+      weekStart: week.weekStart,
+      personName: req.body?.personName,
+      personAvatar: req.body?.personAvatar ?? null,
+      goals: req.body?.goals,
+      status: req.body?.status,
+      progress: req.body?.progress,
+      nextFocus: req.body?.nextFocus
+    });
+    res.status(201).json({ row, weekStart: week.weekStart });
+  } catch (err) {
+    console.error("Failed to create personal goal:", err);
+    res.status(500).json({ error: "Không tạo được mục tiêu cá nhân." });
+  }
+});
+
+app.patch("/api/personal-goals/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const row = await updatePersonalGoal(id, {
+      personName: String(req.body?.personName ?? ""),
+      personAvatar: req.body?.personAvatar == null ? null : String(req.body.personAvatar),
+      goals: String(req.body?.goals ?? ""),
+      status: String(req.body?.status ?? "pending"),
+      progress: String(req.body?.progress ?? ""),
+      nextFocus: String(req.body?.nextFocus ?? "")
+    });
+    if (!row) {
+      return res.status(404).json({ error: "Không tìm thấy mục tiêu cá nhân." });
+    }
+    res.json({ row });
+  } catch (err) {
+    console.error("Failed to update personal goal:", err);
+    res.status(500).json({ error: "Không lưu được mục tiêu cá nhân." });
+  }
+});
+
+app.delete("/api/personal-goals/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const ok = await deletePersonalGoal(id);
+    if (!ok) {
+      return res.status(404).json({ error: "Không tìm thấy mục tiêu cá nhân." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Failed to delete personal goal:", err);
+    res.status(500).json({ error: "Không xóa được mục tiêu cá nhân." });
+  }
+});
+
+app.get("/api/day-plans", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const person = String(req.query.person ?? "").trim();
+  if (!person) {
+    return res.status(400).json({ error: "Thiếu tên nhân sự." });
+  }
+
+  try {
+    const board = await getDayPlanBoard(req.query.week, person);
+    res.json(board);
+  } catch (err) {
+    console.error("Failed to load day plans:", err);
+    res.status(500).json({ error: "Không tải được kế hoạch ngày." });
+  }
+});
+
+app.post("/api/day-plans", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const week = resolveWeekStart(req.body?.weekStart ?? req.query.week);
+  const personName = String(req.body?.personName ?? "").trim();
+  const planDate = String(req.body?.planDate ?? "").trim();
+
+  if (!personName || !planDate) {
+    return res.status(400).json({ error: "Thiếu nhân sự hoặc ngày." });
+  }
+
+  try {
+    const item = await createDayPlan({
+      weekStart: week.weekStart,
+      personName,
+      planDate,
+      endDate: req.body?.endDate,
+      title: req.body?.title,
+      notes: req.body?.notes,
+      startMinute: req.body?.startMinute,
+      endMinute: req.body?.endMinute,
+      sourceType: req.body?.sourceType,
+      sourceKey: req.body?.sourceKey,
+      status: req.body?.status,
+      sortOrder: req.body?.sortOrder,
+      reminderEnabled: req.body?.reminderEnabled,
+      reminderMinutesBefore: req.body?.reminderMinutesBefore
+    });
+    res.status(201).json({ item });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "DATE_OUT_OF_WEEK") {
+      return res.status(400).json({ error: "Ngày không thuộc tuần đang chọn." });
+    }
+    console.error("Failed to create day plan:", err);
+    res.status(500).json({ error: "Không tạo được mục trong kế hoạch." });
+  }
+});
+
+app.patch("/api/day-plans/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const item = await updateDayPlan(id, {
+      planDate: req.body?.planDate,
+      endDate: req.body?.endDate,
+      title: req.body?.title,
+      notes: req.body?.notes,
+      startMinute: req.body?.startMinute,
+      endMinute: req.body?.endMinute,
+      status: req.body?.status,
+      sortOrder: req.body?.sortOrder,
+      reminderEnabled: req.body?.reminderEnabled,
+      reminderMinutesBefore: req.body?.reminderMinutesBefore
+    });
+    if (!item) {
+      return res.status(404).json({ error: "Không tìm thấy mục kế hoạch." });
+    }
+    res.json({ item });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "DATE_OUT_OF_WEEK") {
+      return res.status(400).json({ error: "Ngày không thuộc tuần đang chọn." });
+    }
+    console.error("Failed to update day plan:", err);
+    res.status(500).json({ error: "Không lưu được mục kế hoạch." });
+  }
+});
+
+app.post("/api/day-plans/reorder", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const personName = String(req.body?.personName ?? "").trim();
+  const week = resolveWeekStart(req.body?.weekStart ?? req.query.week);
+  const orderedIds = Array.isArray(req.body?.orderedIds)
+    ? req.body.orderedIds.map((v: unknown) => Number(v))
+    : [];
+
+  if (!personName) {
+    return res.status(400).json({ error: "Thiếu nhân sự." });
+  }
+
+  try {
+    const items = await reorderDayPlans(personName, week.weekStart, orderedIds);
+    res.json({ items });
+  } catch (err) {
+    console.error("Failed to reorder day plans:", err);
+    res.status(500).json({ error: "Không sắp xếp được kế hoạch." });
+  }
+});
+
+app.delete("/api/day-plans/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const ok = await deleteDayPlan(id);
+    if (!ok) {
+      return res.status(404).json({ error: "Không tìm thấy mục kế hoạch." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Failed to delete day plan:", err);
+    res.status(500).json({ error: "Không xóa được mục kế hoạch." });
   }
 });
 

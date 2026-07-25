@@ -1,6 +1,6 @@
 import { query } from "./db";
 import { CATEGORIES } from "./migrate";
-import { formatWeekLabel, resolveWeekStart } from "../src/lib/week";
+import { formatDeadlineNote, formatWeekLabel, resolveWeekStart } from "../src/lib/week";
 
 export interface Pic {
   name: string;
@@ -14,6 +14,7 @@ export interface WeeklyTask {
   dod: string;
   pics: Pic[];
   status: string;
+  kpi: string;
   progress: number | null;
   progressNote: string | null;
 }
@@ -43,6 +44,7 @@ interface TaskRow {
   dod: string;
   pics: Pic[] | null;
   status: string;
+  kpi: string;
   progress: number | null;
   progress_note: string | null;
 }
@@ -60,6 +62,23 @@ function normalizePics(raw: Pic[] | null | undefined): Pic[] {
   }));
 }
 
+function mapTask(row: TaskRow): WeeklyTask {
+  return {
+    id: row.id,
+    item: row.item,
+    objective: row.objective,
+    dod: row.dod,
+    pics: normalizePics(row.pics),
+    status: row.status,
+    kpi: row.kpi === "none" ? "" : (row.kpi ?? ""),
+    progress: row.progress,
+    progressNote: row.progress_note
+  };
+}
+
+const TASK_SELECT =
+  "id, category_id, item, objective, dod, pics, status, kpi, progress, progress_note";
+
 export async function getTaskBoard(weekRaw: unknown): Promise<BoardPayload> {
   const week = resolveWeekStart(weekRaw);
 
@@ -67,7 +86,7 @@ export async function getTaskBoard(weekRaw: unknown): Promise<BoardPayload> {
     query<PersonnelRow>(`SELECT name, avatar_url FROM personnel ORDER BY id ASC`),
     query<TaskRow>(
       `
-      SELECT id, category_id, item, objective, dod, pics, status, progress, progress_note
+      SELECT ${TASK_SELECT}
       FROM weekly_tasks
       WHERE week_start = $1::date
       ORDER BY category_id ASC, sort_order ASC, id ASC
@@ -79,16 +98,7 @@ export async function getTaskBoard(weekRaw: unknown): Promise<BoardPayload> {
   const tasksByCategory = new Map<number, WeeklyTask[]>();
   for (const row of tasksRes.rows) {
     const list = tasksByCategory.get(row.category_id) ?? [];
-    list.push({
-      id: row.id,
-      item: row.item,
-      objective: row.objective,
-      dod: row.dod,
-      pics: normalizePics(row.pics),
-      status: row.status,
-      progress: row.progress,
-      progressNote: row.progress_note
-    });
+    list.push(mapTask(row));
     tasksByCategory.set(row.category_id, list);
   }
 
@@ -100,10 +110,10 @@ export async function getTaskBoard(weekRaw: unknown): Promise<BoardPayload> {
 
   return {
     meta: {
-      department: "Phòng Tổ Chức Giáo Viên",
+      department: "",
       weekStart: week.weekStart,
       weekLabel: week.weekLabel || formatWeekLabel(week.start),
-      deadlineNote: "Deadline: 12h thứ 6 hàng tuần"
+      deadlineNote: formatDeadlineNote(week.start)
     },
     personnel: personnelRes.rows.map((p) => ({
       name: p.name,
@@ -121,6 +131,7 @@ export async function createWeeklyTask(input: {
   dod?: string;
   pics?: Pic[];
   status?: string;
+  kpi?: string;
   progress?: number | null;
   progressNote?: string | null;
 }): Promise<WeeklyTask> {
@@ -139,10 +150,10 @@ export async function createWeeklyTask(input: {
   const res = await query<TaskRow>(
     `
     INSERT INTO weekly_tasks (
-      week_start, category_id, item, objective, dod, pics, status, progress, progress_note, sort_order
+      week_start, category_id, item, objective, dod, pics, status, kpi, progress, progress_note, sort_order
     )
-    VALUES ($1::date, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)
-    RETURNING id, category_id, item, objective, dod, pics, status, progress, progress_note
+    VALUES ($1::date, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11)
+    RETURNING ${TASK_SELECT}
     `,
     [
       input.weekStart,
@@ -152,23 +163,14 @@ export async function createWeeklyTask(input: {
       input.dod ?? "",
       pics,
       input.status ?? "pending",
+      input.kpi ?? "",
       input.progress ?? null,
       input.progressNote ?? null,
       sortOrder
     ]
   );
 
-  const row = res.rows[0];
-  return {
-    id: row.id,
-    item: row.item,
-    objective: row.objective,
-    dod: row.dod,
-    pics: normalizePics(row.pics),
-    status: row.status,
-    progress: row.progress,
-    progressNote: row.progress_note
-  };
+  return mapTask(res.rows[0]);
 }
 
 export async function updateWeeklyTask(
@@ -179,6 +181,7 @@ export async function updateWeeklyTask(
     dod: string;
     pics: Pic[];
     status: string;
+    kpi: string;
     progress: number | null;
     progressNote: string | null;
   }
@@ -192,11 +195,12 @@ export async function updateWeeklyTask(
       dod = $4,
       pics = $5::jsonb,
       status = $6,
-      progress = $7,
-      progress_note = $8,
+      kpi = $7,
+      progress = $8,
+      progress_note = $9,
       updated_at = NOW()
     WHERE id = $1
-    RETURNING id, category_id, item, objective, dod, pics, status, progress, progress_note
+    RETURNING ${TASK_SELECT}
     `,
     [
       id,
@@ -205,6 +209,7 @@ export async function updateWeeklyTask(
       input.dod,
       JSON.stringify(input.pics ?? []),
       input.status,
+      input.kpi,
       input.progress,
       input.progressNote
     ]
@@ -212,16 +217,7 @@ export async function updateWeeklyTask(
 
   const row = res.rows[0];
   if (!row) return null;
-  return {
-    id: row.id,
-    item: row.item,
-    objective: row.objective,
-    dod: row.dod,
-    pics: normalizePics(row.pics),
-    status: row.status,
-    progress: row.progress,
-    progressNote: row.progress_note
-  };
+  return mapTask(row);
 }
 
 export async function deleteWeeklyTask(id: number): Promise<boolean> {

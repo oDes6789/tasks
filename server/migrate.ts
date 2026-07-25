@@ -12,7 +12,10 @@ const CATEGORIES = [
 ] as const;
 
 const PERSONNEL = [
+  { name: "Ms. Hoàng Thị", avatar_url: null },
+  { name: "Ms. Hà Thu", avatar_url: null },
   { name: "Ms. Kim Bắc", avatar_url: null },
+  { name: "Mr. Đức Anh", avatar_url: null },
   { name: "Mr. Tiến Dũng", avatar_url: null },
   { name: "Ms. Thu Hà", avatar_url: null },
   { name: "Mr. Minh Quân", avatar_url: null },
@@ -42,6 +45,7 @@ export async function migrate(): Promise<void> {
       dod TEXT NOT NULL DEFAULT '',
       pics JSONB NOT NULL DEFAULT '[]'::jsonb,
       status TEXT NOT NULL DEFAULT 'pending',
+      kpi TEXT NOT NULL DEFAULT '',
       progress INTEGER,
       progress_note TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
@@ -54,6 +58,71 @@ export async function migrate(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_weekly_tasks_week_category
       ON weekly_tasks (week_start, category_id, sort_order);
+
+    ALTER TABLE weekly_tasks
+      ADD COLUMN IF NOT EXISTS kpi TEXT NOT NULL DEFAULT '';
+
+    ALTER TABLE weekly_tasks
+      ALTER COLUMN kpi SET DEFAULT '';
+
+    UPDATE weekly_tasks SET kpi = '' WHERE kpi IN ('none') OR kpi IS NULL;
+
+    CREATE TABLE IF NOT EXISTS personal_goals (
+      id SERIAL PRIMARY KEY,
+      week_start DATE NOT NULL,
+      person_name TEXT NOT NULL DEFAULT '',
+      person_avatar TEXT,
+      goals TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      progress TEXT NOT NULL DEFAULT '',
+      next_focus TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_personal_goals_week_start
+      ON personal_goals (week_start);
+
+    CREATE INDEX IF NOT EXISTS idx_personal_goals_week_sort
+      ON personal_goals (week_start, sort_order, id);
+
+    CREATE TABLE IF NOT EXISTS personal_day_plans (
+      id SERIAL PRIMARY KEY,
+      week_start DATE NOT NULL,
+      person_name TEXT NOT NULL,
+      plan_date DATE NOT NULL,
+      end_date DATE,
+      title TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      start_minute INTEGER,
+      end_minute INTEGER,
+      source_type TEXT NOT NULL DEFAULT 'custom',
+      source_key TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    ALTER TABLE personal_day_plans
+      ADD COLUMN IF NOT EXISTS end_date DATE;
+
+    ALTER TABLE personal_day_plans
+      ADD COLUMN IF NOT EXISTS reminder_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+    ALTER TABLE personal_day_plans
+      ADD COLUMN IF NOT EXISTS reminder_minutes_before INTEGER NOT NULL DEFAULT 15;
+
+    UPDATE personal_day_plans
+    SET end_date = plan_date
+    WHERE end_date IS NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_day_plans_person_week
+      ON personal_day_plans (person_name, week_start, plan_date, sort_order, id);
+
+    CREATE INDEX IF NOT EXISTS idx_day_plans_week_date
+      ON personal_day_plans (week_start, plan_date);
   `);
 
   for (const cat of CATEGORIES) {

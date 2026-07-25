@@ -57,6 +57,8 @@ const route = useRoute();
 const mainLinks = [
   { to: "/", label: "Dashboard", icon: "dashboard" },
   { to: "/tasks", label: "Mục tiêu tuần", icon: "assignment" },
+  { to: "/muc-tieu-ca-nhan", label: "Mục tiêu cá nhân", icon: "person" },
+  { to: "/ke-hoach", label: "Kế hoạch ngày", icon: "calendar_month" },
   { to: "/okrs", label: "OKR Management", icon: "track_changes" },
   { to: "/team", label: "Team Directory", icon: "group" }
 ];

@@ -62,6 +62,34 @@ export function formatWeekLabel(monday: Date): string {
   return `Tuần ${w} Tháng ${month} (${range})`;
 }
 
+/** Friday noon of the Mon–Sat work week. */
+export function getDeadlineAt(monday: Date): Date {
+  const friday = addDays(monday, 4);
+  return new Date(friday.getFullYear(), friday.getMonth(), friday.getDate(), 12, 0, 0, 0);
+}
+
+/** Friday noon of the Mon–Sat work week, e.g. "DL nhập thành phẩm: 12h 24/07/2026". */
+export function formatDeadlineNote(monday: Date): string {
+  const deadline = getDeadlineAt(monday);
+  const dd = String(deadline.getDate()).padStart(2, "0");
+  const mm = String(deadline.getMonth() + 1).padStart(2, "0");
+  const yyyy = deadline.getFullYear();
+  return `DL nhập thành phẩm: 12h ${dd}/${mm}/${yyyy}`;
+}
+
+export type DeadlineUrgency = "ok" | "soon" | "urgent" | "critical" | "overdue";
+
+/** Urgency relative to Friday 12:00 deadline. */
+export function getDeadlineUrgency(deadline: Date, now: Date = new Date()): DeadlineUrgency {
+  const ms = deadline.getTime() - now.getTime();
+  if (ms < 0) return "overdue";
+  const hours = ms / (1000 * 60 * 60);
+  if (hours <= 3) return "critical";
+  if (hours <= 24) return "urgent";
+  if (hours <= 48) return "soon";
+  return "ok";
+}
+
 export function getWeekInfo(date: Date = new Date()): WeekInfo {
   const start = startOfWeek(date);
   const end = addDays(start, 5);
