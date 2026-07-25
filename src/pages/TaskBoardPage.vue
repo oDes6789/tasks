@@ -74,7 +74,7 @@
 
     <!-- Column labels -->
     <div
-      class="mb-3 hidden grid-cols-[minmax(140px,0.9fr)_minmax(180px,1.2fr)_minmax(200px,1.3fr)_minmax(180px,1.1fr)_120px_minmax(140px,1fr)] gap-4 px-5 text-[11px] font-semibold uppercase tracking-[0.06em] text-primary/70 lg:grid"
+      class="mb-3 hidden grid-cols-[minmax(120px,0.85fr)_minmax(160px,1.15fr)_minmax(180px,1.25fr)_minmax(150px,1fr)_110px_minmax(120px,0.9fr)_88px] gap-4 px-5 text-[11px] font-semibold uppercase tracking-[0.06em] text-primary/70 lg:grid"
     >
       <span v-for="col in columns" :key="col">{{ col }}</span>
     </div>
@@ -150,24 +150,26 @@
           <article
             v-for="(task, index) in group.tasks"
             :key="task.id"
-            class="grid grid-cols-1 items-start gap-4 px-4 py-4 transition-colors hover:bg-surface-container-low/50 sm:px-5 lg:grid-cols-[minmax(140px,0.9fr)_minmax(180px,1.2fr)_minmax(200px,1.3fr)_minmax(180px,1.1fr)_120px_minmax(140px,1fr)] lg:gap-4"
+            class="grid grid-cols-1 items-start gap-4 px-4 py-4 transition-colors hover:bg-surface-container-low/50 sm:px-5 lg:grid-cols-[minmax(120px,0.85fr)_minmax(160px,1.15fr)_minmax(180px,1.25fr)_minmax(150px,1fr)_110px_minmax(120px,0.9fr)_88px] lg:gap-4"
             :class="[
               index > 0 ? 'border-t border-surface-container' : '',
-              task.isNew ? 'bg-primary-fixed/25 new-task-row' : ''
+              isEditing(task) ? 'bg-primary-fixed/25 new-task-row' : ''
             ]"
-            @keydown.enter.exact="onNewRowEnter($event, task)"
+            @keydown.enter.exact="onEditRowEnter($event, task)"
           >
             <div data-field="item">
               <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-primary/50 lg:hidden">
                 Hạng mục
               </p>
               <InputText
-                v-if="task.isNew"
+                v-if="isEditing(task)"
                 v-model="task.item"
                 class="w-full text-sm font-semibold"
                 placeholder="Hạng mục..."
               />
-              <p v-else class="text-sm font-semibold text-on-surface">{{ task.item }}</p>
+              <p v-else class="text-sm font-semibold text-on-surface">
+                {{ task.item || "—" }}
+              </p>
             </div>
 
             <div data-field="objective">
@@ -175,14 +177,14 @@
                 Mục tiêu
               </p>
               <Textarea
-                v-if="task.isNew"
+                v-if="isEditing(task)"
                 v-model="task.objective"
                 rows="3"
                 class="w-full text-sm leading-relaxed"
                 placeholder="Mục tiêu..."
               />
               <p v-else class="whitespace-pre-line text-sm leading-relaxed text-on-surface">
-                {{ task.objective }}
+                {{ task.objective || "—" }}
               </p>
             </div>
 
@@ -191,14 +193,14 @@
                 DOD / Tiêu chuẩn
               </p>
               <Textarea
-                v-if="task.isNew"
+                v-if="isEditing(task)"
                 v-model="task.dod"
                 rows="3"
                 class="w-full text-sm leading-relaxed"
                 placeholder="DOD / tiêu chuẩn..."
               />
               <p v-else class="whitespace-pre-line text-sm leading-relaxed text-on-surface-variant">
-                {{ task.dod }}
+                {{ task.dod || "—" }}
               </p>
             </div>
 
@@ -206,9 +208,9 @@
               <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-primary/50 lg:hidden">
                 PIC
               </p>
-              <div class="flex flex-col items-stretch gap-1.5">
+              <div class="flex flex-wrap items-center gap-1.5">
                 <MultiSelect
-                  v-if="task.isNew"
+                  v-if="isEditing(task)"
                   :modelValue="picNames(task)"
                   :options="personnel"
                   optionLabel="name"
@@ -224,12 +226,28 @@
                   @update:modelValue="(names) => setPics(task, names)"
                 />
                 <template v-else>
-                  <PersonTag
+                  <Chip
                     v-for="pic in task.pics"
                     :key="pic.name"
-                    :name="pic.name"
-                    :avatar="pic.avatar"
-                  />
+                    :label="pic.name"
+                    class="pic-chip"
+                  >
+                    <template #icon>
+                      <img
+                        v-if="pic.avatar"
+                        :src="pic.avatar"
+                        :alt="pic.name"
+                        class="mr-1 h-5 w-5 rounded-full object-cover"
+                      />
+                      <span
+                        v-else
+                        class="mr-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary"
+                      >
+                        {{ picInitials(pic.name) }}
+                      </span>
+                    </template>
+                  </Chip>
+                  <span v-if="task.pics.length === 0" class="text-sm text-on-surface-variant">—</span>
                 </template>
               </div>
             </div>
@@ -246,14 +264,49 @@
                 Tiến độ
               </p>
               <InputText
-                v-if="task.isNew"
+                v-if="isEditing(task)"
                 v-model="task.progressNote"
                 class="w-full text-sm"
                 placeholder="Tiến độ..."
+                @keydown.enter.exact.prevent="saveTask(task)"
               />
               <p v-else class="text-sm text-on-surface-variant">
                 {{ task.progressNote || "—" }}
               </p>
+            </div>
+
+            <div class="flex items-start justify-end gap-1 pt-0.5 lg:justify-start">
+              <button
+                v-if="isEditing(task)"
+                type="button"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-on-primary transition-colors hover:brightness-110 disabled:opacity-50"
+                :disabled="savingIds.has(task.id)"
+                title="Lưu"
+                aria-label="Lưu"
+                @click="saveTask(task)"
+              >
+                <Icon name="check" icon-class="text-[18px]" />
+              </button>
+              <button
+                v-else
+                type="button"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-primary transition-colors hover:bg-secondary-container"
+                title="Sửa"
+                aria-label="Sửa"
+                @click="task.isEditing = true"
+              >
+                <Icon name="edit" icon-class="text-[18px]" />
+              </button>
+              <button
+                type="button"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-error transition-colors hover:bg-error-container/50 disabled:opacity-50"
+                :disabled="savingIds.has(task.id) || deletingIds.has(task.id)"
+                title="Xóa"
+                aria-label="Xóa"
+                @click="deleteTask(group.id, task)"
+              >
+                <Icon name="delete" icon-class="text-[18px]" />
+              </button>
             </div>
           </article>
         </div>
@@ -264,12 +317,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import Chip from "primevue/chip";
 import DatePicker from "primevue/datepicker";
 import InputText from "primevue/inputtext";
 import MultiSelect from "primevue/multiselect";
 import Textarea from "primevue/textarea";
+import { useConfirm } from "primevue/useconfirm";
+import { useToast } from "primevue/usetoast";
 import Icon from "@/components/Icon.vue";
-import PersonTag from "@/components/PersonTag.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { authHeaders } from "@/lib/auth";
 import { getWeekInfo, parseIsoDate } from "@/lib/week";
@@ -288,7 +343,7 @@ interface WeeklyTask {
   status: string;
   progress: number | null;
   progressNote: string | null;
-  isNew?: boolean;
+  isEditing?: boolean;
 }
 
 interface TaskGroup {
@@ -310,9 +365,12 @@ const columns = [
   "DOD / Tiêu chuẩn",
   "PIC",
   "Status",
-  "Tiến độ / Thành phẩm"
+  "Tiến độ / Thành phẩm",
+  ""
 ];
 
+const toast = useToast();
+const confirm = useConfirm();
 const initialWeek = getWeekInfo();
 
 const meta = ref<BoardMeta>({
@@ -327,7 +385,20 @@ const personnel = ref<Pic[]>([]);
 const collapsed = ref(new Set<number>());
 const selectedWeekStart = ref(initialWeek.weekStart);
 const weekRange = ref<Date[] | null>([initialWeek.start, initialWeek.end]);
+const savingIds = ref(new Set<number>());
+const deletingIds = ref(new Set<number>());
 let nextTaskId = 1000;
+
+const DEFAULT_GROUPS: TaskGroup[] = [
+  { id: 1, title: "1. TUYỂN DỤNG", tasks: [] },
+  { id: 2, title: "2. ĐÀO TẠO", tasks: [] },
+  { id: 3, title: "3. VẬN HÀNH", tasks: [] },
+  { id: 4, title: "4. TRIỂN KHAI MỚI", tasks: [] },
+  { id: 5, title: "5. OKR", tasks: [] },
+  { id: 6, title: "6. VẤN ĐỀ TỒN ĐỌNG", tasks: [] },
+  { id: 7, title: "7. ĐỀ XUẤT", tasks: [] },
+  { id: 8, title: "8. NOTE", tasks: [] }
+];
 
 const defaultPersonnel: Pic[] = [
   { name: "Ms. Kim Bắc", avatar: null },
@@ -336,6 +407,42 @@ const defaultPersonnel: Pic[] = [
   { name: "Mr. Minh Quân", avatar: null },
   { name: "Ms. Lan Anh", avatar: null }
 ];
+
+function isBlankDraft(
+  task: Pick<WeeklyTask, "item" | "objective" | "dod" | "progressNote" | "pics">
+) {
+  return (
+    !task.item?.trim() &&
+    !task.objective?.trim() &&
+    !task.dod?.trim() &&
+    !task.progressNote?.trim() &&
+    (!task.pics || task.pics.length === 0)
+  );
+}
+
+function hydrateTask(task: WeeklyTask): WeeklyTask {
+  return {
+    ...task,
+    progressNote: task.progressNote ?? "",
+    isEditing: isBlankDraft(task)
+  };
+}
+
+function mergeFixedGroups(incoming: TaskGroup[] | null | undefined): TaskGroup[] {
+  const byId = new Map((incoming ?? []).map((g) => [g.id, g]));
+  return DEFAULT_GROUPS.map((def) => {
+    const found = byId.get(def.id);
+    return {
+      id: def.id,
+      title: found?.title || def.title,
+      tasks: (found?.tasks ?? []).map((t) => hydrateTask(t))
+    };
+  });
+}
+
+function isEditing(task: WeeklyTask) {
+  return Boolean(task.isEditing);
+}
 
 const allCollapsed = computed(() => {
   if (groups.value.length === 0) return false;
@@ -361,33 +468,46 @@ function toggleCollapseAll() {
   }
 }
 
-const NEW_ROW_FIELDS = ["item", "objective", "dod", "pics", "progress"] as const;
+const EDIT_ROW_FIELDS = ["item", "objective", "dod", "pics", "progress"] as const;
 
 function picNames(task: WeeklyTask) {
   return task.pics.map((p) => p.name);
 }
 
-function onNewRowEnter(event: KeyboardEvent, task: WeeklyTask) {
-  if (!task.isNew) return;
+function picInitials(name: string) {
+  const parts = name.replace(/^(Ms\.|Mr\.)\s*/i, "").split(/\s+/);
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function onEditRowEnter(event: KeyboardEvent, task: WeeklyTask) {
+  if (!isEditing(task)) return;
 
   const target = event.target as HTMLElement | null;
   if (!target) return;
-  // Đang mở dropdown PIC / đang gõ filter → để MultiSelect xử lý
   if (target.closest(".p-multiselect-overlay, .p-multiselect-list, .p-overlay")) return;
 
   const fieldEl = target.closest<HTMLElement>("[data-field]");
   const field = fieldEl?.dataset.field;
   if (!field) return;
 
-  const idx = NEW_ROW_FIELDS.indexOf(field as (typeof NEW_ROW_FIELDS)[number]);
-  if (idx < 0 || idx >= NEW_ROW_FIELDS.length - 1) return;
+  const idx = EDIT_ROW_FIELDS.indexOf(field as (typeof EDIT_ROW_FIELDS)[number]);
+  if (idx < 0) return;
+
+  if (idx >= EDIT_ROW_FIELDS.length - 1) {
+    event.preventDefault();
+    void saveTask(task);
+    return;
+  }
 
   event.preventDefault();
   const row = event.currentTarget as HTMLElement;
-  focusNewRowField(row, NEW_ROW_FIELDS[idx + 1]);
+  focusEditRowField(row, EDIT_ROW_FIELDS[idx + 1]);
 }
 
-function focusNewRowField(row: HTMLElement, field: string) {
+function focusEditRowField(row: HTMLElement, field: string) {
   const wrap = row.querySelector<HTMLElement>(`[data-field="${field}"]`);
   if (!wrap) return;
 
@@ -410,7 +530,7 @@ function setPics(task: WeeklyTask, names: string[] | null | undefined) {
   });
 }
 
-function addRow(groupId: number) {
+async function addRow(groupId: number) {
   const group = groups.value.find((g) => g.id === groupId);
   if (!group) return;
 
@@ -420,17 +540,153 @@ function addRow(groupId: number) {
     collapsed.value = next;
   }
 
-  group.tasks.push({
-    id: nextTaskId++,
-    item: "",
-    objective: "",
-    dod: "",
-    pics: [],
-    status: "pending",
-    progress: null,
-    progressNote: "",
-    isNew: true
+  try {
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders()
+      },
+      body: JSON.stringify({
+        weekStart: selectedWeekStart.value,
+        categoryId: groupId
+      })
+    });
+    if (!res.ok) throw new Error("create failed");
+    const data = await res.json();
+    const task = hydrateTask(data.task as WeeklyTask);
+    task.isEditing = true;
+    group.tasks.push(task);
+    nextTaskId = Math.max(nextTaskId, task.id + 1);
+  } catch {
+    toast.add({
+      severity: "error",
+      summary: "Lỗi",
+      detail: "Không tạo được dòng mới.",
+      life: 3000
+    });
+  }
+}
+
+async function saveTask(task: WeeklyTask) {
+  if (savingIds.value.has(task.id)) return;
+
+  const next = new Set(savingIds.value);
+  next.add(task.id);
+  savingIds.value = next;
+
+  try {
+    const res = await fetch(`/api/tasks/${task.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders()
+      },
+      body: JSON.stringify({
+        item: task.item ?? "",
+        objective: task.objective ?? "",
+        dod: task.dod ?? "",
+        pics: task.pics ?? [],
+        status: task.status ?? "pending",
+        progress: task.progress,
+        progressNote: task.progressNote || null
+      })
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(errBody?.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (!data?.task) throw new Error("Phản hồi lưu không hợp lệ.");
+    const saved = data.task as WeeklyTask;
+    task.item = saved.item;
+    task.objective = saved.objective;
+    task.dod = saved.dod;
+    task.pics = saved.pics ?? [];
+    task.status = saved.status;
+    task.progress = saved.progress;
+    task.progressNote = saved.progressNote ?? "";
+    task.isEditing = false;
+
+    toast.add({
+      severity: "success",
+      summary: "Đã lưu",
+      detail: "Mục tiêu đã được lưu thành công.",
+      life: 2500
+    });
+  } catch (err) {
+    toast.add({
+      severity: "error",
+      summary: "Lỗi",
+      detail: err instanceof Error ? err.message : "Không lưu được mục tiêu.",
+      life: 3500
+    });
+  } finally {
+    const done = new Set(savingIds.value);
+    done.delete(task.id);
+    savingIds.value = done;
+  }
+}
+
+async function deleteTask(groupId: number, task: WeeklyTask) {
+  if (deletingIds.value.has(task.id)) return;
+
+  confirm.require({
+    message: "Bạn có chắc muốn xóa mục tiêu này? Hành động không thể hoàn tác.",
+    header: "Xóa mục tiêu",
+    icon: "pi pi-exclamation-triangle",
+    rejectProps: {
+      label: "Hủy",
+      severity: "secondary",
+      outlined: true
+    },
+    acceptProps: {
+      label: "Xóa",
+      severity: "danger"
+    },
+    accept: () => {
+      void performDeleteTask(groupId, task);
+    }
   });
+}
+
+async function performDeleteTask(groupId: number, task: WeeklyTask) {
+  if (deletingIds.value.has(task.id)) return;
+
+  const next = new Set(deletingIds.value);
+  next.add(task.id);
+  deletingIds.value = next;
+
+  try {
+    const res = await fetch(`/api/tasks/${task.id}`, {
+      method: "DELETE",
+      headers: { ...authHeaders() }
+    });
+    if (!res.ok) throw new Error("delete failed");
+
+    const group = groups.value.find((g) => g.id === groupId);
+    if (group) {
+      group.tasks = group.tasks.filter((t) => t.id !== task.id);
+    }
+
+    toast.add({
+      severity: "success",
+      summary: "Đã xóa",
+      detail: "Mục tiêu đã được xóa.",
+      life: 2500
+    });
+  } catch {
+    toast.add({
+      severity: "error",
+      summary: "Lỗi",
+      detail: "Không xóa được mục tiêu.",
+      life: 3000
+    });
+  } finally {
+    const done = new Set(deletingIds.value);
+    done.delete(task.id);
+    deletingIds.value = done;
+  }
 }
 
 function syncWeekRange(weekStart: string) {
@@ -476,6 +732,7 @@ async function loadBoard(weekStart: string) {
     });
     if (!res.ok) {
       personnel.value = defaultPersonnel;
+      groups.value = mergeFixedGroups([]);
       syncWeekRange(weekStart);
       return;
     }
@@ -493,7 +750,7 @@ async function loadBoard(weekStart: string) {
       Array.isArray(data.personnel) && data.personnel.length > 0
         ? data.personnel
         : defaultPersonnel;
-    groups.value = data.groups ?? [];
+    groups.value = mergeFixedGroups(data.groups);
     collapsed.value = new Set();
     const maxId = groups.value
       .flatMap((g) => g.tasks)
@@ -501,12 +758,14 @@ async function loadBoard(weekStart: string) {
     nextTaskId = maxId + 1;
   } catch {
     personnel.value = defaultPersonnel;
+    groups.value = mergeFixedGroups([]);
   }
 }
 
 onMounted(() => {
   void loadBoard(selectedWeekStart.value);
 });
+
 </script>
 
 <style scoped>
@@ -598,6 +857,17 @@ onMounted(() => {
 .new-task-row :deep(.p-chip),
 .new-task-row :deep(.p-multiselect-chip) {
   border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.pic-chip {
+  background: var(--color-secondary-container);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.pic-chip :deep(.p-chip-label) {
   font-size: 0.75rem;
 }
 </style>

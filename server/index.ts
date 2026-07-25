@@ -5,6 +5,9 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { createSessionToken, verifySessionToken } from "./sessionToken";
 import { getUserById, toPublicUser, upsertUserFromEdutalk } from "./users";
+import { migrate } from "./migrate";
+import { ensureDatabase } from "./ensureDatabase";
+import { createWeeklyTask, deleteWeeklyTask, getTaskBoard, updateWeeklyTask } from "./tasksRepo";
 import { resolveWeekStart } from "../src/lib/week";
 
 dotenv.config();
@@ -285,101 +288,112 @@ app.get("/api/dashboard/summary", (req, res) => {
   });
 });
 
-const TASK_PERSONNEL = [
-  { name: "Ms. Kim Bắc", avatar: null },
-  { name: "Mr. Tiến Dũng", avatar: null },
-  { name: "Ms. Thu Hà", avatar: null },
-  { name: "Mr. Minh Quân", avatar: null },
-  { name: "Ms. Lan Anh", avatar: null }
-];
-
-const TASK_GROUPS_SEED = [
-  {
-    id: 4,
-    title: "4. TRIỂN KHAI MỚI",
-    tasks: [
-      {
-        id: 1,
-        item: "Quản Trị Thu Nhập",
-        objective:
-          "Hoàn thiện quy trình theo dõi thu nhập giảng viên theo tuần và chuẩn hóa báo cáo phòng.",
-        dod: "1. File theo dõi cập nhật đủ cột\n2. Đối soát với kế toán xong\n3. Gửi báo cáo trước deadline",
-        pics: [{ name: "Ms. Kim Bắc", avatar: null }],
-        status: "pending",
-        progress: null,
-        progressNote: null
-      },
-      {
-        id: 2,
-        item: "Product Updates",
-        objective:
-          "Tổng hợp cập nhật sản phẩm nội bộ và phổ biến thay đổi cho đội ngũ giáo viên.",
-        dod: "1. Slide/note cập nhật\n2. Share trong group phòng\n3. Thu feedback tuần này",
-        pics: [{ name: "Mr. Tiến Dũng", avatar: null }],
-        status: "pending",
-        progress: null,
-        progressNote: null
-      }
-    ]
-  },
-  {
-    id: 5,
-    title: "5. OKR MANAGEMENT",
-    tasks: [
-      {
-        id: 3,
-        item: "Theo dõi OKR",
-        objective: "Review tiến độ OKR tuần của từng nhóm và ghi nhận blocker.",
-        dod: "1. Checklist OKR đã review\n2. Ghi chú blocker rõ ràng\n3. Cập nhật board chung",
-        pics: [
-          { name: "Mr. Tiến Dũng", avatar: null },
-          { name: "Ms. Kim Bắc", avatar: null }
-        ],
-        status: "done",
-        progress: 100,
-        progressNote: "Đã review và cập nhật board"
-      },
-      {
-        id: 4,
-        item: "Đánh giá giữa kỳ",
-        objective: "Chuẩn bị khung đánh giá giữa kỳ và phân công PIC hỗ trợ từng nhóm.",
-        dod: "1. Form đánh giá\n2. Lịch họp review\n3. Danh sách PIC hỗ trợ",
-        pics: [{ name: "Mr. Tiến Dũng", avatar: null }],
-        status: "in_progress",
-        progress: 45,
-        progressNote: "Đang soạn form đánh giá"
-      }
-    ]
-  }
-];
-
-app.get("/api/tasks", (req, res) => {
+app.get("/api/tasks", async (req, res) => {
   const user = getSessionUser(req);
   if (!user) {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
 
-  const week = resolveWeekStart(req.query.week);
-  const currentWeekStart = resolveWeekStart(undefined).weekStart;
-  // Seed data only for the current week; other weeks start empty.
-  const groups =
-    week.weekStart === currentWeekStart
-      ? TASK_GROUPS_SEED
-      : TASK_GROUPS_SEED.map((g) => ({ ...g, tasks: [] as typeof g.tasks }));
+  try {
+    const board = await getTaskBoard(req.query.week);
+    res.json(board);
+  } catch (err) {
+    console.error("Failed to load task board:", err);
+    res.status(500).json({ error: "Không tải được mục tiêu tuần." });
+  }
+});
 
-  res.json({
-    meta: {
-      department: "Phòng Tổ Chức Giáo Viên",
+app.post("/api/tasks", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const categoryId = Number(req.body?.categoryId);
+  if (!Number.isInteger(categoryId) || categoryId < 1 || categoryId > 8) {
+    return res.status(400).json({ error: "categoryId không hợp lệ." });
+  }
+
+  const week = resolveWeekStart(req.body?.weekStart ?? req.query.week);
+
+  try {
+    const task = await createWeeklyTask({
       weekStart: week.weekStart,
-      weekLabel: week.weekLabel,
-      deadlineNote: "Deadline: 12h thứ 6 hàng tuần"
-    },
-    personnel: TASK_PERSONNEL,
-    groups
-  });
+      categoryId,
+      item: req.body?.item,
+      objective: req.body?.objective,
+      dod: req.body?.dod,
+      pics: req.body?.pics,
+      status: req.body?.status,
+      progress: req.body?.progress,
+      progressNote: req.body?.progressNote
+    });
+    res.status(201).json({ task, weekStart: week.weekStart });
+  } catch (err) {
+    console.error("Failed to create weekly task:", err);
+    res.status(500).json({ error: "Không tạo được mục tiêu." });
+  }
+});
+
+app.patch("/api/tasks/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const task = await updateWeeklyTask(id, {
+      item: String(req.body?.item ?? ""),
+      objective: String(req.body?.objective ?? ""),
+      dod: String(req.body?.dod ?? ""),
+      pics: Array.isArray(req.body?.pics) ? req.body.pics : [],
+      status: String(req.body?.status ?? "pending"),
+      progress: req.body?.progress == null ? null : Number(req.body.progress),
+      progressNote: req.body?.progressNote == null ? null : String(req.body.progressNote)
+    });
+    if (!task) {
+      return res.status(404).json({ error: "Không tìm thấy mục tiêu." });
+    }
+    res.json({ task });
+  } catch (err) {
+    console.error("Failed to update weekly task:", err);
+    res.status(500).json({ error: "Không lưu được mục tiêu." });
+  }
+});
+
+app.delete("/api/tasks/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const ok = await deleteWeeklyTask(id);
+    if (!ok) {
+      return res.status(404).json({ error: "Không tìm thấy mục tiêu." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Failed to delete weekly task:", err);
+    res.status(500).json({ error: "Không xóa được mục tiêu." });
+  }
 });
 
 async function start() {
+  await ensureDatabase();
+  await migrate();
+  console.log("PostgreSQL schema ready.");
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       root,
@@ -390,6 +404,9 @@ async function start() {
     app.use(vite.middlewares);
 
     app.use("*", async (req, res, next) => {
+      if (req.originalUrl.startsWith("/api")) {
+        return res.status(404).json({ error: "API không tồn tại." });
+      }
       try {
         const url = req.originalUrl;
         const template = await vite.transformIndexHtml(
@@ -405,7 +422,10 @@ async function start() {
   } else {
     const dist = path.join(root, "dist", "client");
     app.use(express.static(dist));
-    app.get("*", (_req, res) => {
+    app.get("*", (req, res) => {
+      if (req.originalUrl.startsWith("/api")) {
+        return res.status(404).json({ error: "API không tồn tại." });
+      }
       res.sendFile(path.join(dist, "index.html"));
     });
   }
