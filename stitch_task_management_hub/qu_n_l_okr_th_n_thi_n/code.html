@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TaskSpace - OKR Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#464554",
+                    "surface-container-high": "#dce9ff",
+                    "on-secondary-container": "#666073",
+                    "tertiary-fixed": "#e3e2e4",
+                    "surface-container-lowest": "#ffffff",
+                    "outline-variant": "#c7c4d7",
+                    "secondary-container": "#e5dcf4",
+                    "primary-fixed-dim": "#c0c1ff",
+                    "on-primary-container": "#fffbff",
+                    "primary": "#4648d4",
+                    "background": "#f8f9ff",
+                    "inverse-primary": "#c0c1ff",
+                    "on-background": "#0b1c30",
+                    "primary-container": "#6063ee",
+                    "surface-variant": "#d3e4fe",
+                    "surface-dim": "#cbdbf5",
+                    "primary-fixed": "#e1e0ff",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-container": "#fdfcfe",
+                    "secondary": "#615b6f",
+                    "tertiary": "#5b5c5e",
+                    "inverse-on-surface": "#eaf1ff",
+                    "inverse-surface": "#213145",
+                    "outline": "#767586",
+                    "surface-container-low": "#eff4ff",
+                    "on-secondary": "#ffffff",
+                    "surface-tint": "#494bd6",
+                    "secondary-fixed-dim": "#cbc3da",
+                    "on-surface": "#0b1c30",
+                    "on-primary-fixed-variant": "#2f2ebe",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "on-tertiary-fixed": "#1a1c1d",
+                    "tertiary-container": "#747476",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed-variant": "#494457",
+                    "tertiary-fixed-dim": "#c6c6c8",
+                    "surface-bright": "#f8f9ff",
+                    "on-tertiary-fixed-variant": "#464749",
+                    "on-primary-fixed": "#07006c",
+                    "surface": "#f8f9ff",
+                    "secondary-fixed": "#e7dff6",
+                    "on-error-container": "#93000a",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed": "#1d192a",
+                    "surface-container": "#e5eeff",
+                    "surface-container-highest": "#d3e4fe"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-padding": "24px",
+                    "stack-lg": "48px",
+                    "stack-sm": "12px",
+                    "stack-md": "24px",
+                    "gutter": "16px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Inter"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["26px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .soft-shadow-l2 {
+            box-shadow: 0px 10px 30px rgba(70, 72, 212, 0.08);
+        }
+        .progress-ring-circle {
+            transition: stroke-dashoffset 1s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- Side Navigation Bar -->
+<nav class="fixed left-0 top-0 h-full p-stack-md flex flex-col gap-base bg-surface-container-low dark:bg-surface-dim w-72 z-50">
+<div class="px-4 py-6">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">TaskSpace</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">Workspace Management</p>
+</div>
+<div class="flex-1 space-y-2 px-2">
+<!-- Navigation Items -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-label-md text-label-md">Task Board</span>
+</a>
+<!-- Active State -->
+<a class="flex items-center gap-3 px-4 py-3 text-primary dark:text-primary-fixed-dim font-bold bg-secondary-container dark:bg-on-secondary-fixed-variant rounded-full transition-transform scale-98 active:scale-95" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">track_changes</span>
+<span class="font-label-md text-label-md">OKR Management</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md text-label-md">Team Directory</span>
+</a>
+</div>
+<div class="px-4 mb-4">
+<button class="w-full bg-primary text-on-primary py-3 px-6 rounded-full font-label-md text-label-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                New Task
+            </button>
+</div>
+<div class="px-2 pt-4 border-t border-outline-variant/20 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Support</span>
+</a>
+</div>
+</nav>
+<!-- Top App Bar -->
+<header class="fixed top-0 right-0 left-72 z-40 flex justify-between items-center px-container-padding h-16 bg-surface-bright/80 dark:bg-background/80 backdrop-blur-md shadow-sm">
+<div class="flex items-center bg-surface-container-low px-4 py-1.5 rounded-full w-96 transition-all focus-within:ring-2 focus-within:ring-primary/20">
+<span class="material-symbols-outlined text-outline">search</span>
+<input class="bg-transparent border-none focus:ring-0 w-full text-label-md font-label-md" placeholder="Search objectives..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">calendar_today</span>
+</button>
+<div class="relative p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</div>
+<button class="bg-primary-container text-on-primary-container px-6 py-2 rounded-full font-label-md text-label-md">
+                Quick Action
+            </button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-container">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a friendly business executive with a warm smile, set against a soft-focus office background with gentle indigo lighting accents that match the UI design system's aesthetic. The lighting is diffused and modern, emphasizing clarity and approachability." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR512gNjJuYXzgBzThQ7SgjDfgnpgcQY2XTVg0RmKVffo1VJd-0SQTfK8bEJj7q2sGQPsCS4RCNWMX23ULPFHxFZs9j4r_icXyyeisQlDzGX4JAX_qSg0a5QuVgAHqylGoULHNXUT9k6tW88Qi5bRl__FWdsH3mcjKM8RWyDOWKncj169OK4QXs-NQFxFx-hy-vraPrXLUmzTDj9vujAFVogbBpeQxQCvynsz8EaUtB2W3id0b8kwuxwfqXhYephyytpjzcgDLqsA"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-72 pt-16 p-stack-md flex flex-col lg:flex-row gap-gutter">
+<!-- Center Content: OKR Performance -->
+<div class="flex-1 space-y-gutter">
+<!-- Hero Progress Card -->
+<section class="bg-surface-container-lowest p-stack-lg rounded-lg soft-shadow-l2 flex flex-col md:flex-row items-center gap-stack-lg border border-primary/5">
+<div class="relative w-48 h-48 flex items-center justify-center">
+<svg class="w-full h-full">
+<circle class="text-surface-container" cx="96" cy="96" fill="transparent" r="88" stroke="currentColor" stroke-width="12"></circle>
+<circle class="text-primary progress-ring-circle" cx="96" cy="96" fill="transparent" r="88" stroke="currentColor" stroke-dasharray="552.92" stroke-dashoffset="138.23" stroke-linecap="round" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-4xl font-bold text-primary">75%</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Overall</span>
+</div>
+</div>
+<div class="flex-1 space-y-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background">July OKR Performance</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-2">You're making great progress this month, Sarah! 3 out of 4 objectives are on track to completion.</p>
+</div>
+<div class="flex gap-4">
+<div class="bg-secondary-container px-4 py-2 rounded-full flex items-center gap-2">
+<span class="material-symbols-outlined text-on-secondary-container">trending_up</span>
+<span class="font-label-md text-label-md text-on-secondary-container">+12% from June</span>
+</div>
+<div class="bg-surface-container-high px-4 py-2 rounded-full flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">flag</span>
+<span class="font-label-md text-label-md text-primary">Target: 85%</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Key Results List -->
+<section class="space-y-4">
+<div class="flex justify-between items-center px-2">
+<h3 class="font-headline-md text-headline-md text-on-background">Key Results</h3>
+<button class="text-primary font-label-md text-label-md hover:underline">View All</button>
+</div>
+<!-- KR Card 1 -->
+<div class="bg-surface-container-lowest p-stack-md rounded-lg soft-shadow-l2 flex items-center gap-6 border border-primary/5 hover:scale-[1.01] transition-transform duration-200">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">rocket_launch</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md font-bold text-on-background">Increase product adoption by 25%</h4>
+<div class="mt-2 w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 65%;"></div>
+</div>
+</div>
+<div class="flex items-center gap-4 min-w-[140px] justify-end">
+<div class="text-right">
+<p class="font-label-md text-label-md font-bold">65%</p>
+<p class="text-xs text-on-surface-variant">Owner: John D.</p>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A small profile avatar of a friendly male professional wearing glasses, looking towards the camera with a confident yet approachable expression. Minimalist and professional style matching a clean UI environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuO-6RsTcerxFtuH_PYPNjF3ZMFIMcz6on_j6YQ4usu_-M1cxzRJ5lLtHnG2iClmvjmVGjNTQJt44x43ZMaDFRLMnS7RZk-0bjb4MJFIXpvYH8GmhmepCXApQYji3cpbG4L-Bxxhf_Z8KAuRWXizUQaaVlXAkdmiPgjJftqyQ3MGmZAOKy1T14N-0mMnUjUNVFhTmm--iP-uizkGH5vD9chOP9cygCQreoso-tjcloohbsjbLMEwKzeexxc1kXWQxsLpaVyV5HrUw"/>
+</div>
+</div>
+</div>
+<!-- KR Card 2 -->
+<div class="bg-surface-container-lowest p-stack-md rounded-lg soft-shadow-l2 flex items-center gap-6 border border-primary/5 hover:scale-[1.01] transition-transform duration-200">
+<div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">speed</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md font-bold text-on-background">Reduce server latency to &lt; 200ms</h4>
+<div class="mt-2 w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 88%;"></div>
+</div>
+</div>
+<div class="flex items-center gap-4 min-w-[140px] justify-end">
+<div class="text-right">
+<p class="font-label-md text-label-md font-bold text-secondary">88%</p>
+<p class="text-xs text-on-surface-variant">Owner: Alex K.</p>
+</div>
+<div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A small profile avatar of a focused female engineer with a professional look. The style is clean and matches a soft landing digital interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4ZAm0qtf970AnNC3Puh4EKmXyqQT99B2WR8yPaCS-I_TvEQjcNEhorAgIzcD0mMw31Rc_Y-6i6_w1zhKkIDhnHp92BhTma6FfCeySCug_N_-b1AyXtN4iRTIiCNzqJjKLS1OdSU1Hu2a0YsHL5a8msYU32f9fGRZQ9j9wNV1EZ2QEnzjIvtCOs03jcA8UwdPmfk_SDCEB9fniboRkaWl06WQUCDT7OjfQeXUCmRbxVpJj4w2UaQrnoyAvqfts19OBhrbyMYqYBdI"/>
+</div>
+</div>
+</div>
+<!-- KR Card 3 -->
+<div class="bg-surface-container-lowest p-stack-md rounded-lg soft-shadow-l2 flex items-center gap-6 border border-primary/5 hover:scale-[1.01] transition-transform duration-200">
+<div class="w-12 h-12 rounded-full bg-error-container flex items-center justify-center text-error">
+<span class="material-symbols-outlined">groups</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md font-bold text-on-background">Hire 3 new senior frontend developers</h4>
+<div class="mt-2 w-full bg-surface-container h-2 rounded-full overflow-hidden">
+<div class="bg-error h-full rounded-full" style="width: 33%;"></div>
+</div>
+</div>
+<div class="flex items-center gap-4 min-w-[140px] justify-end">
+<div class="text-right">
+<p class="font-label-md text-label-md font-bold text-error">33%</p>
+<p class="text-xs text-on-surface-variant">Owner: Me</p>
+</div>
+<div class="w-8 h-8 rounded-full bg-primary-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a friendly business executive with a warm smile, set against a soft-focus office background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCUmyX3KNjZ38sR8I6xB90xNw_K07gF-jGc91tVn-zfRSiB-QFhWcASOJxjm2uDnmv7mz5IIWLFX8DnYhNQEzNq-oxwjH4FGS7KSSqC8ZM51k-RupfKa8enKRR7sevhJvE80IetHbnfoTR8WjI2TrtfeT7hmOBbckNpIzBSzgSXyPbsIpZ2jdHgBJgZelZmzDXsMtiFxHu3AqUPJp6Ol1alSeG6ERlZncWARiXeLNk7btWGSi4E1ZqAPITBKa5WbFc_eL4mokaHcg"/>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Sidebar: Focus Items -->
+<aside class="w-full lg:w-80 space-y-gutter">
+<div class="bg-surface-container-low p-stack-md rounded-lg h-full">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-on-background">Focus Item</h3>
+<span class="material-symbols-outlined text-primary">priority_high</span>
+</div>
+<!-- Focus Card -->
+<div class="bg-surface-container-lowest rounded-lg p-stack-md soft-shadow-l2 border border-primary/5 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-2">
+<span class="px-3 py-1 bg-primary-container text-on-primary-container text-[10px] uppercase font-bold rounded-full">High Priority</span>
+<span class="text-on-surface-variant text-xs">Due in 3 days</span>
+</div>
+<h4 class="font-headline-md text-headline-md text-on-background leading-tight">Q3 Strategy Finalization</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">The board presentation is on Friday. Ensure all KR data from the marketing team is consolidated and verified.</p>
+<div class="pt-4 border-t border-outline-variant/30">
+<p class="font-label-md text-label-md font-bold mb-2">Checklist</p>
+<div class="space-y-2">
+<label class="flex items-center gap-3 cursor-pointer group/check">
+<input checked="" class="w-5 h-5 rounded-full border-primary text-primary focus:ring-primary/20" type="checkbox"/>
+<span class="font-label-md text-label-md text-on-surface-variant line-through">Draft v1.0 complete</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer">
+<input class="w-5 h-5 rounded-full border-primary text-primary focus:ring-primary/20" type="checkbox"/>
+<span class="font-label-md text-label-md text-on-surface">Gather metrics from SEO</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer">
+<input class="w-5 h-5 rounded-full border-primary text-primary focus:ring-primary/20" type="checkbox"/>
+<span class="font-label-md text-label-md text-on-surface">Review with stakeholders</span>
+</label>
+</div>
+</div>
+<div class="flex items-center justify-between mt-6">
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border-2 border-surface-container-lowest bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Avatar of a creative professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1g1CaDFiY2MaXoLuaVRHzolOmbH7A4vX0eyktpL0etkLryKRv8iJX4kGwOcNJb61MisfpdV4KJj1JiBTM2ULbnfCraSRMpbo9MAEp4IZ5wGx-2PoPkp3B8jr4YiWW3mIBfA7M71cy2pd_cmnBqNPclyOlW6RV0VqyB_0HWwaeIUAZhy4pABUDpr9_Ddtw9EYFPqjjlvaZY7M1MnP9BemaOHImyfu0-_XtxQWc_SG5ZKL7g6qTbe6RHrun-sacMOAxe1E3p1q2FdQ"/>
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-surface-container-lowest bg-primary-container overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Avatar of a creative professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdTdOuktUD8rzYe7cQp2UMR5o2Dua3WXzC4XRbK3cRHr0YeEkFBiDu0Srvq5Ij0vo1c3oCuDerz5dzs2x3gBHJjMyq3LIPbpLXM6LacTdJNYwYpQfZ68qywBbTQxESFfOp2lPz1QiobwzhI4oCIhSi3x4yRF0A2u6hV0RgGcxl6-u3plqSfwWuHWEcB37OdPm9xVTbSoZtqAIZ_-SCbWy7mtlCxR9fUV1ilooR6wavNqyfpQUuQaWVK_zTfJr7DcCc-dBCaCcuZZo"/>
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-surface-container-lowest bg-surface-container-high flex items-center justify-center text-[10px] font-bold text-primary">
+                                    +2
+                                </div>
+</div>
+<button class="bg-primary text-on-primary w-10 h-10 rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Secondary focus/stats -->
+<div class="mt-8 space-y-4">
+<h4 class="font-label-md text-label-md font-bold text-on-surface-variant">Team Velocity</h4>
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-highest p-4 rounded-lg flex flex-col items-center">
+<span class="text-2xl font-bold text-primary">12</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Tasks done</span>
+</div>
+<div class="bg-surface-container-highest p-4 rounded-lg flex flex-col items-center">
+<span class="text-2xl font-bold text-on-surface-variant">4</span>
+<span class="text-[10px] text-on-surface-variant uppercase font-bold">Pending</span>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</main>
+<!-- Floating Action for OKR (Bottom Right) -->
+<div class="fixed bottom-8 right-8 z-50">
+<button class="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+<span class="font-label-md text-label-md font-bold">New Objective</span>
+</button>
+</div>
+<script>
+        // Micro-interaction: Progress Ring Animation
+        window.addEventListener('DOMContentLoaded', () => {
+            const circle = document.querySelector('.progress-ring-circle');
+            const radius = circle.r.baseVal.value;
+            const circumference = radius * 2 * Math.PI;
+            
+            circle.style.strokeDasharray = `${circumference} ${circumference}`;
+            circle.style.strokeDashoffset = circumference;
+
+            function setProgress(percent) {
+                const offset = circumference - (percent / 100 * circumference);
+                circle.style.strokeDashoffset = offset;
+            }
+
+            // Animate to 75%
+            setTimeout(() => {
+                setProgress(75);
+            }, 500);
+        });
+
+        // Toggle focus checks for demo
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const span = e.target.nextElementSibling;
+                if (e.target.checked) {
+                    span.classList.add('line-through', 'text-on-surface-variant');
+                } else {
+                    span.classList.remove('line-through', 'text-on-surface-variant');
+                }
+            });
+        });
+    </script>
+</body></html>

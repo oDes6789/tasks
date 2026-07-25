@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Task Board - TaskSpace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#464554",
+                    "surface-container-high": "#dce9ff",
+                    "on-secondary-container": "#666073",
+                    "tertiary-fixed": "#e3e2e4",
+                    "surface-container-lowest": "#ffffff",
+                    "outline-variant": "#c7c4d7",
+                    "secondary-container": "#e5dcf4",
+                    "primary-fixed-dim": "#c0c1ff",
+                    "on-primary-container": "#fffbff",
+                    "primary": "#4648d4",
+                    "background": "#f8f9ff",
+                    "inverse-primary": "#c0c1ff",
+                    "on-background": "#0b1c30",
+                    "primary-container": "#6063ee",
+                    "surface-variant": "#d3e4fe",
+                    "surface-dim": "#cbdbf5",
+                    "primary-fixed": "#e1e0ff",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-container": "#fdfcfe",
+                    "secondary": "#615b6f",
+                    "tertiary": "#5b5c5e",
+                    "inverse-on-surface": "#eaf1ff",
+                    "inverse-surface": "#213145",
+                    "outline": "#767586",
+                    "surface-container-low": "#eff4ff",
+                    "on-secondary": "#ffffff",
+                    "surface-tint": "#494bd6",
+                    "secondary-fixed-dim": "#cbc3da",
+                    "on-surface": "#0b1c30",
+                    "on-primary-fixed-variant": "#2f2ebe",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "on-tertiary-fixed": "#1a1c1d",
+                    "tertiary-container": "#747476",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed-variant": "#494457",
+                    "tertiary-fixed-dim": "#c6c6c8",
+                    "surface-bright": "#f8f9ff",
+                    "on-tertiary-fixed-variant": "#464749",
+                    "on-primary-fixed": "#07006c",
+                    "surface": "#f8f9ff",
+                    "secondary-fixed": "#e7dff6",
+                    "on-error-container": "#93000a",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed": "#1d192a",
+                    "surface-container": "#e5eeff",
+                    "surface-container-highest": "#d3e4fe"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-padding": "24px",
+                    "stack-lg": "48px",
+                    "stack-sm": "12px",
+                    "stack-md": "24px",
+                    "gutter": "16px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Inter"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "26px", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["26px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #f8f9ff;
+            color: #0b1c30;
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .soft-card-shadow {
+            box-shadow: 0px 10px 30px rgba(70, 72, 212, 0.08);
+        }
+        .glass-header {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+<!-- SideNavBar Anchor -->
+<aside class="fixed left-0 top-0 h-full p-stack-md flex flex-col gap-base bg-surface-container-low dark:bg-surface-dim w-72 z-50">
+<div class="px-4 py-6 flex items-center gap-3">
+<div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">layers</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">TaskSpace</h1>
+<p class="text-[10px] font-label-md uppercase tracking-wider text-on-surface-variant opacity-70">Workspace Management</p>
+</div>
+</div>
+<button class="mx-4 mb-6 bg-primary text-white py-3 px-6 rounded-full font-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95">
+<span class="material-symbols-outlined">add</span>
+            New Task
+        </button>
+<nav class="flex-1 flex flex-col px-2 gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md">Dashboard</span>
+</a>
+<!-- Active State: Task Board -->
+<a class="flex items-center gap-3 px-4 py-3 text-primary dark:text-primary-fixed-dim font-bold bg-secondary-container dark:bg-on-secondary-fixed-variant rounded-full" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">assignment</span>
+<span class="font-label-md">Task Board</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">track_changes</span>
+<span class="font-label-md">OKR Management</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-high dark:hover:bg-surface-container rounded-full transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md">Team Directory</span>
+</a>
+</nav>
+<div class="mt-auto px-2 border-t border-surface-container pt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md">Support</span>
+</a>
+</div>
+</aside>
+<!-- TopAppBar Anchor -->
+<header class="fixed top-0 right-0 left-72 z-40 flex justify-between items-center px-container-padding h-16 bg-surface-bright/80 dark:bg-background/80 backdrop-blur-md shadow-sm">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant opacity-50">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-label-md focus:ring-2 focus:ring-primary/20 transition-all" placeholder="Search tasks, teams, or OKRs..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full transition-colors">
+<span class="material-symbols-outlined">calendar_today</span>
+</button>
+</div>
+<div class="h-8 w-[1px] bg-outline-variant mx-1"></div>
+<button class="bg-secondary-container text-primary font-label-md px-4 py-2 rounded-full hover:bg-primary-container hover:text-white transition-all">
+                Quick Action
+            </button>
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/10">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a friendly workspace manager in a bright, airy office environment. The person has a warm, welcoming expression, styled with modern business casual attire. High-quality portrait photography with soft bokeh background and warm, natural sunlight filtering through windows, matching the clean and hospitable TaskSpace UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDHJOy2th8Joev7xznWHlUfplLFmsUTvoxIHJIa11JLLxZBLt-AzjVIxrwKIdmqkWCOArvVNhanpNihSiVSbJUXGy1vSCtnxqaZX9YMA61xE8jJye9FNw9Dte9Alma6aHs84DyPUSuapE24znBqepy70qhSBaf6rmLk2BRDBW2PueQ6kCExWWCy_jKvnCKKYt1OUAnZsRVLMRunaYXcPE3igcEaayAL5jpgvBwi8oT9j7pvdA2MfXt5RzrMu7hK8uXZAXjzalsLsPg"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-72 pt-24 pb-12 px-container-padding">
+<!-- Header Section -->
+<div class="mb-stack-md flex justify-between items-end">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-1">Task Board</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage and track team progress across all active projects.</p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-5 py-2.5 bg-white text-on-surface-variant rounded-full border border-surface-container soft-card-shadow font-label-md hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined">filter_list</span>
+                    Filter
+                </button>
+<button class="flex items-center gap-2 px-5 py-2.5 bg-white text-on-surface-variant rounded-full border border-surface-container soft-card-shadow font-label-md hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined">sort</span>
+                    Sort
+                </button>
+</div>
+</div>
+<!-- Task Table/Card Hybrid Layout -->
+<div class="flex flex-col gap-4">
+<!-- Table Header -->
+<div class="grid grid-cols-[140px_1fr_160px_140px_200px] px-8 py-4 text-on-surface-variant font-label-md opacity-60">
+<div>Category</div>
+<div>Objective</div>
+<div class="text-center">PIC</div>
+<div class="text-center">Status</div>
+<div class="text-right">Results</div>
+</div>
+<!-- Task Row 1 -->
+<div class="grid grid-cols-[140px_1fr_160px_140px_200px] items-center bg-white p-6 rounded-lg soft-card-shadow hover:translate-y-[-2px] transition-transform cursor-pointer group">
+<div>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-surface-container text-primary font-label-md text-xs">Design System</span>
+</div>
+<div class="pr-8">
+<h4 class="font-body-lg text-body-lg font-bold text-on-surface group-hover:text-primary transition-colors">Finalize Component Library v2.4</h4>
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70 line-clamp-1">Updates to the accessible color tokens and elevation levels.</p>
+</div>
+<div class="flex justify-center -space-x-3">
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden" title="Sarah Jenkins">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of a female creative lead with glasses, smiling softly. The lighting is soft and studio-quality, emphasizing a professional yet approachable aesthetic. The background is a soft blue pastel gradient, consistent with the workspace app's calming indigo theme." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjcfTa1eq55T7iLvwzJLnENifIvpmixb2-O6vFOlRagu7uTtIQypzbR6kpEni76m4kHJ1g5F8U1ZPZgDbrg5rhPUU6epQKRaIY9XPG_dQsH5Gt13h3iD3G6W1SfvMZpaXULBD82cE2NuvSbk3hiQ8oM8fD566o9ZPpqnAdW30OhyG4z3mX8M9cZdeD-8ylpnl--MoUln3LNPnT6ZBGLqAEirzbZmKuPRKArOztPC2F9H_WtwwdKNVcgdOtA2DCk-NNQTV0R4TQdc8"/>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden" title="Mike Chen">
+<img class="w-full h-full object-cover" data-alt="Portrait of a male UI designer in a modern studio environment. The image uses soft, warm lighting and a high-key background. He wears a minimalist black t-shirt and has a friendly, engaged expression. The overall style is clean, modern, and high-fidelity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2bWDo82miZiaFcStv4Y07mSJ9IRACY6fXw4hGYSvOrhMoZBMj7e7RWvelHphH3FyrnlW-2ESA6Mbzsl9tfbbXHJsoGakK8J9eP4gw638YtyFY6iGgQ1Cwu4NIBPuB8CQUgffMl-zlq2gxup00jXyRLrMy32RoWeoRuY9aCxwJeJvhJkzDkFQxzi1gAyy5E6AeQGEHymEut1xEtS_GoE0s6QGa6ftSq0srN4WNJYd569C4zUuixQVCx_9AdbT78fFV4MilDhzqmw0"/>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="px-4 py-1.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-md text-xs border border-on-secondary-container/10">In Progress</span>
+</div>
+<div class="text-right">
+<div class="flex items-center justify-end gap-2 mb-1">
+<span class="font-label-md text-primary">65%</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 65%;"></div>
+</div>
+</div>
+</div>
+<!-- Task Row 2 -->
+<div class="grid grid-cols-[140px_1fr_160px_140px_200px] items-center bg-white p-6 rounded-lg soft-card-shadow hover:translate-y-[-2px] transition-transform cursor-pointer group">
+<div>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-[#fce8e6] text-[#ba1a1a] font-label-md text-xs">Urgent</span>
+</div>
+<div class="pr-8">
+<h4 class="font-body-lg text-body-lg font-bold text-on-surface group-hover:text-primary transition-colors">Client Onboarding Flow Redesign</h4>
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70 line-clamp-1">Simplify the 5-step process into a single conversational interface.</p>
+</div>
+<div class="flex justify-center">
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden" title="Alex Rivera">
+<img class="w-full h-full object-cover" data-alt="A portrait of a male product manager with a friendly and focused expression. Soft directional lighting highlights his face against a clean, modern office backdrop. The visual style is premium and high-definition, fitting for a sophisticated task management platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjAwvJJdAfHJfGhsGE4wNrBP2Z6_Tg4z1MuBpPjr1z1-3e7Af4p5BA1bzLSPxPwidue4tKT2-DrOWtw9cX1lqH-FiVxnZLBhIDnT1_tsaOr5GC-VwX7SRwe1ZV7mVppPmzFTPqbYpr5O2w_3nvFuGa7kLU6U-cYRaT0vNz8ar86VRf9P7drLhQcemFR0A5ncMWzDp22K4MV9vAVPYnvMqCmRYVjmaJFFE3kEOBxRz2QaVh6Ddyo2VQONLcn2M1EyDTpN99OO8m38A"/>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="px-4 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-xs">Waiting</span>
+</div>
+<div class="text-right">
+<span class="font-label-md text-on-surface-variant">Scheduled for Mon</span>
+</div>
+</div>
+<!-- Task Row 3 -->
+<div class="grid grid-cols-[140px_1fr_160px_140px_200px] items-center bg-white p-6 rounded-lg soft-card-shadow hover:translate-y-[-2px] transition-transform cursor-pointer group">
+<div>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-surface-container text-primary font-label-md text-xs">Engineering</span>
+</div>
+<div class="pr-8">
+<h4 class="font-body-lg text-body-lg font-bold text-on-surface group-hover:text-primary transition-colors">API Performance Optimization</h4>
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70 line-clamp-1">Reducing average response time by 30% for mobile endpoints.</p>
+</div>
+<div class="flex justify-center -space-x-3">
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden" title="Elena Kozlov">
+<img class="w-full h-full object-cover" data-alt="Portrait of a female engineer with a professional, confident smile. She is in a tech-forward workspace with soft neon accents in the background. The lighting is crisp and modern, emphasizing clarity and expertise. The color palette is aligned with cool blues and indigos." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEH-HcwO_sitJ8wAUPv3GUpQJrmrFOKwyDN1HEl53OaAEbvyvmTnJRgRoasgnKKlMzhvMmErKVH7bVWPkjYKa0aaEaZabE15IZZ1tH_LOCQMrKKcUiMldD5PPl9GCaRio3ghrlsWdpIfJWuhrriqfg93tarSlGNn8R2R1OQueB67aCM7iDrS7e-aUYOvYFDo7d99X1R8yC7fmO1uehVA7lpxQUiZpMA6DrDnTBo3feOyoSSUGZeD7mGQ44TQsPKjmF5RjH6Q0dz9A"/>
+</div>
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden flex items-center justify-center bg-surface-container-high text-primary font-bold text-xs">
+                        +3
+                    </div>
+</div>
+<div class="flex justify-center">
+<span class="px-4 py-1.5 rounded-full bg-[#e6f4ea] text-[#137333] font-label-md text-xs border border-green-100">Completed</span>
+</div>
+<div class="text-right">
+<div class="flex items-center justify-end gap-1 text-green-600 font-label-md">
+<span class="material-symbols-outlined text-sm">check_circle</span>
+                        Done
+                    </div>
+</div>
+</div>
+<!-- Task Row 4 -->
+<div class="grid grid-cols-[140px_1fr_160px_140px_200px] items-center bg-white p-6 rounded-lg soft-card-shadow hover:translate-y-[-2px] transition-transform cursor-pointer group">
+<div>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-surface-container text-primary font-label-md text-xs">Marketing</span>
+</div>
+<div class="pr-8">
+<h4 class="font-body-lg text-body-lg font-bold text-on-surface group-hover:text-primary transition-colors">Q4 Campaign Asset Generation</h4>
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70 line-clamp-1">Designing social media banners and email templates for the holiday push.</p>
+</div>
+<div class="flex justify-center">
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden" title="Jordan Smith">
+<img class="w-full h-full object-cover" data-alt="Portrait of a youthful marketing specialist in a bright, colorful creative studio. The lighting is vibrant and energetic. He has an enthusiastic expression and modern styling. The background features blurred artistic elements that suggest a creative workspace." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlwxBxxJJkWSCLdjGEBBI-I7KBvcl5joXCDBPBHtQd1PcJ0FIT_mSYvgAzuJYwQAgRts-e3jppdU4_qymqRpaPeJFV-wrOSqMib3FFEQZbUUGovvnia852VNTRl_cVOaw0oSRwuZGONodE9MJkE9BOOVioJz7esEtW9_lqoylFDFP_tlyRXuABHNMcYu7ou_X6MMKuwKPlbRHivssDxUAoiWm5L-0e_kN7reNWjTygPsuLoURzw3qdFYWY87CUxn3fG8DhYicKrCU"/>
+</div>
+</div>
+<div class="flex justify-center">
+<span class="px-4 py-1.5 rounded-full bg-secondary-container text-on-secondary-fixed-variant font-label-md text-xs">In Progress</span>
+</div>
+<div class="text-right">
+<div class="flex items-center justify-end gap-2 mb-1">
+<span class="font-label-md text-primary">22%</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 22%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Pagination / Footer Info -->
+<div class="mt-8 flex justify-between items-center px-8">
+<p class="text-label-md text-on-surface-variant opacity-60">Showing 4 of 24 active tasks</p>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center rounded-full border border-surface-container hover:bg-white transition-all text-on-surface-variant">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-primary text-white font-label-md">1</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white transition-all text-on-surface-variant font-label-md">2</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white transition-all text-on-surface-variant font-label-md">3</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-full border border-surface-container hover:bg-white transition-all text-on-surface-variant">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Suppressing on Details, but keeping for Board) -->
+<button class="fixed bottom-8 right-8 w-16 h-16 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-50 group">
+<span class="material-symbols-outlined text-3xl group-hover:rotate-90 transition-transform">add</span>
+</button>
+<script>
+        // Interactive Micro-interactions
+        document.querySelectorAll('.grid.cursor-pointer').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                row.style.boxShadow = '0px 15px 40px rgba(70, 72, 212, 0.12)';
+            });
+            row.addEventListener('mouseleave', () => {
+                row.style.boxShadow = '0px 10px 30px rgba(70, 72, 212, 0.08)';
+            });
+        });
+
+        // Search Bar focus effect
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('scale-105');
+            searchInput.parentElement.style.transition = 'transform 0.3s ease';
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('scale-105');
+        });
+    </script>
+</body></html>
