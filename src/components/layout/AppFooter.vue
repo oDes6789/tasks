@@ -1,6 +1,6 @@
 <template>
   <footer
-    class="ml-72 border-t border-surface-container bg-surface-container-low/70 px-container-padding py-6"
+    class="border-t border-surface-container bg-surface-container-low/70 px-container-padding py-6"
   >
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div>
