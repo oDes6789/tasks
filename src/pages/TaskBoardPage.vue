@@ -127,35 +127,16 @@
 
         <!-- Tasks -->
         <div v-show="!isCollapsed(group.id)">
-          <div
-            v-if="group.tasks.length === 0"
-            class="flex flex-col items-center gap-3 px-5 py-10 text-center"
-          >
-            <span
-              class="flex h-11 w-11 items-center justify-center rounded-full bg-surface-container-low text-primary"
-            >
-              <Icon name="playlist_add" icon-class="text-[22px]" />
-            </span>
-            <p class="text-sm text-on-surface-variant">Chưa có mục tiêu trong nhóm này.</p>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary hover:brightness-110"
-              @click="addRow(group.id)"
-            >
-              <Icon name="add" icon-class="text-[16px]" />
-              Thêm dòng đầu tiên
-            </button>
-          </div>
-
           <article
-            v-for="(task, index) in group.tasks"
-            :key="task.id"
+            v-for="(task, index) in visibleRows(group)"
+            :key="task.isDraft ? `draft-${group.id}` : task.id"
             class="grid grid-cols-1 items-start gap-4 px-4 py-4 transition-colors hover:bg-surface-container-low/50 sm:px-5 lg:grid-cols-[minmax(120px,0.85fr)_minmax(160px,1.15fr)_minmax(180px,1.25fr)_minmax(150px,1fr)_110px_minmax(120px,0.9fr)_88px] lg:gap-4"
             :class="[
               index > 0 ? 'border-t border-surface-container' : '',
-              isEditing(task) ? 'bg-primary-fixed/25 new-task-row' : ''
+              isEditing(task) || task.isDraft ? 'bg-primary-fixed/25 new-task-row' : ''
             ]"
-            @keydown.enter.exact="onEditRowEnter($event, task)"
+            :data-draft-group="task.isDraft ? group.id : undefined"
+            @keydown.enter.exact="onEditRowEnter($event, task, group.id)"
           >
             <div data-field="item">
               <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-primary/50 lg:hidden">
@@ -268,7 +249,7 @@
                 v-model="task.progressNote"
                 class="w-full text-sm"
                 placeholder="Tiến độ..."
-                @keydown.enter.exact.prevent="saveTask(task)"
+                @keydown.enter.exact.prevent="saveTask(task, group.id)"
               />
               <p v-else class="text-sm text-on-surface-variant">
                 {{ task.progressNote || "—" }}
@@ -283,7 +264,7 @@
                 :disabled="savingIds.has(task.id)"
                 title="Lưu"
                 aria-label="Lưu"
-                @click="saveTask(task)"
+                @click="saveTask(task, group.id)"
               >
                 <Icon name="check" icon-class="text-[18px]" />
               </button>
@@ -301,8 +282,8 @@
                 type="button"
                 class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-error transition-colors hover:bg-error-container/50 disabled:opacity-50"
                 :disabled="savingIds.has(task.id) || deletingIds.has(task.id)"
-                title="Xóa"
-                aria-label="Xóa"
+                :title="task.isDraft ? 'Xóa nội dung' : 'Xóa'"
+                :aria-label="task.isDraft ? 'Xóa nội dung' : 'Xóa'"
                 @click="deleteTask(group.id, task)"
               >
                 <Icon name="delete" icon-class="text-[18px]" />
@@ -344,6 +325,7 @@ interface WeeklyTask {
   progress: number | null;
   progressNote: string | null;
   isEditing?: boolean;
+  isDraft?: boolean;
 }
 
 interface TaskGroup {
@@ -400,6 +382,33 @@ const DEFAULT_GROUPS: TaskGroup[] = [
   { id: 8, title: "8. NOTE", tasks: [] }
 ];
 
+function createEmptyDraft(groupId: number): WeeklyTask {
+  return {
+    id: -groupId,
+    item: "",
+    objective: "",
+    dod: "",
+    pics: [],
+    status: "pending",
+    progress: null,
+    progressNote: "",
+    isEditing: true,
+    isDraft: true
+  };
+}
+
+const drafts = ref<Record<number, WeeklyTask>>(
+  Object.fromEntries(DEFAULT_GROUPS.map((g) => [g.id, createEmptyDraft(g.id)]))
+);
+
+function resetDraft(groupId: number) {
+  drafts.value[groupId] = createEmptyDraft(groupId);
+}
+
+function visibleRows(group: TaskGroup): WeeklyTask[] {
+  return [...group.tasks, drafts.value[group.id]];
+}
+
 const defaultPersonnel: Pic[] = [
   { name: "Ms. Kim Bắc", avatar: null },
   { name: "Mr. Tiến Dũng", avatar: null },
@@ -424,7 +433,8 @@ function hydrateTask(task: WeeklyTask): WeeklyTask {
   return {
     ...task,
     progressNote: task.progressNote ?? "",
-    isEditing: isBlankDraft(task)
+    isEditing: false,
+    isDraft: false
   };
 }
 
@@ -441,7 +451,7 @@ function mergeFixedGroups(incoming: TaskGroup[] | null | undefined): TaskGroup[]
 }
 
 function isEditing(task: WeeklyTask) {
-  return Boolean(task.isEditing);
+  return Boolean(task.isEditing || task.isDraft);
 }
 
 const allCollapsed = computed(() => {
@@ -482,7 +492,7 @@ function picInitials(name: string) {
     .join("");
 }
 
-function onEditRowEnter(event: KeyboardEvent, task: WeeklyTask) {
+function onEditRowEnter(event: KeyboardEvent, task: WeeklyTask, groupId: number) {
   if (!isEditing(task)) return;
 
   const target = event.target as HTMLElement | null;
@@ -498,7 +508,7 @@ function onEditRowEnter(event: KeyboardEvent, task: WeeklyTask) {
 
   if (idx >= EDIT_ROW_FIELDS.length - 1) {
     event.preventDefault();
-    void saveTask(task);
+    void saveTask(task, groupId);
     return;
   }
 
@@ -530,45 +540,26 @@ function setPics(task: WeeklyTask, names: string[] | null | undefined) {
   });
 }
 
-async function addRow(groupId: number) {
-  const group = groups.value.find((g) => g.id === groupId);
-  if (!group) return;
-
+function focusDraft(groupId: number) {
   if (collapsed.value.has(groupId)) {
     const next = new Set(collapsed.value);
     next.delete(groupId);
     collapsed.value = next;
   }
 
-  try {
-    const res = await fetch("/api/tasks", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...authHeaders()
-      },
-      body: JSON.stringify({
-        weekStart: selectedWeekStart.value,
-        categoryId: groupId
-      })
-    });
-    if (!res.ok) throw new Error("create failed");
-    const data = await res.json();
-    const task = hydrateTask(data.task as WeeklyTask);
-    task.isEditing = true;
-    group.tasks.push(task);
-    nextTaskId = Math.max(nextTaskId, task.id + 1);
-  } catch {
-    toast.add({
-      severity: "error",
-      summary: "Lỗi",
-      detail: "Không tạo được dòng mới.",
-      life: 3000
-    });
-  }
+  requestAnimationFrame(() => {
+    const row = document.querySelector<HTMLElement>(`[data-draft-group="${groupId}"]`);
+    if (!row) return;
+    row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    focusEditRowField(row, "item");
+  });
 }
 
-async function saveTask(task: WeeklyTask) {
+function addRow(groupId: number) {
+  focusDraft(groupId);
+}
+
+async function saveTask(task: WeeklyTask, groupId: number) {
   if (savingIds.value.has(task.id)) return;
 
   const next = new Set(savingIds.value);
@@ -576,6 +567,48 @@ async function saveTask(task: WeeklyTask) {
   savingIds.value = next;
 
   try {
+    if (task.isDraft) {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders()
+        },
+        body: JSON.stringify({
+          weekStart: selectedWeekStart.value,
+          categoryId: groupId,
+          item: task.item ?? "",
+          objective: task.objective ?? "",
+          dod: task.dod ?? "",
+          pics: task.pics ?? [],
+          status: task.status ?? "pending",
+          progress: task.progress,
+          progressNote: task.progressNote || null
+        })
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data?.task) throw new Error("Phản hồi lưu không hợp lệ.");
+
+      const group = groups.value.find((g) => g.id === groupId);
+      const saved = hydrateTask(data.task as WeeklyTask);
+      saved.isEditing = false;
+      group?.tasks.push(saved);
+      nextTaskId = Math.max(nextTaskId, saved.id + 1);
+      resetDraft(groupId);
+
+      toast.add({
+        severity: "success",
+        summary: "Đã lưu",
+        detail: "Mục tiêu đã được thêm thành công.",
+        life: 2500
+      });
+      return;
+    }
+
     const res = await fetch(`/api/tasks/${task.id}`, {
       method: "PATCH",
       headers: {
@@ -628,8 +661,41 @@ async function saveTask(task: WeeklyTask) {
   }
 }
 
+function clearDraft(groupId: number) {
+  resetDraft(groupId);
+  toast.add({
+    severity: "info",
+    summary: "Đã xóa nội dung",
+    detail: "Dòng thêm mới đã được làm trống.",
+    life: 2000
+  });
+}
+
 async function deleteTask(groupId: number, task: WeeklyTask) {
   if (deletingIds.value.has(task.id)) return;
+
+  if (task.isDraft) {
+    if (isBlankDraft(task)) {
+      focusDraft(groupId);
+      return;
+    }
+    confirm.require({
+      message: "Xóa nội dung đang nhập trên dòng thêm mới?",
+      header: "Xóa nội dung",
+      icon: "pi pi-exclamation-triangle",
+      rejectProps: {
+        label: "Hủy",
+        severity: "secondary",
+        outlined: true
+      },
+      acceptProps: {
+        label: "Xóa",
+        severity: "danger"
+      },
+      accept: () => clearDraft(groupId)
+    });
+    return;
+  }
 
   confirm.require({
     message: "Bạn có chắc muốn xóa mục tiêu này? Hành động không thể hoàn tác.",
@@ -733,6 +799,7 @@ async function loadBoard(weekStart: string) {
     if (!res.ok) {
       personnel.value = defaultPersonnel;
       groups.value = mergeFixedGroups([]);
+      for (const g of DEFAULT_GROUPS) resetDraft(g.id);
       syncWeekRange(weekStart);
       return;
     }
@@ -751,6 +818,7 @@ async function loadBoard(weekStart: string) {
         ? data.personnel
         : defaultPersonnel;
     groups.value = mergeFixedGroups(data.groups);
+    for (const g of DEFAULT_GROUPS) resetDraft(g.id);
     collapsed.value = new Set();
     const maxId = groups.value
       .flatMap((g) => g.tasks)
@@ -759,6 +827,7 @@ async function loadBoard(weekStart: string) {
   } catch {
     personnel.value = defaultPersonnel;
     groups.value = mergeFixedGroups([]);
+    for (const g of DEFAULT_GROUPS) resetDraft(g.id);
   }
 }
 
