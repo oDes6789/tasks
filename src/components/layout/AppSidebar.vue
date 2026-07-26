@@ -40,6 +40,15 @@
         <Icon :name="item.icon" />
         <span class="text-label-md">{{ item.label }}</span>
       </RouterLink>
+      <button
+        type="button"
+        class="group flex items-center gap-4 rounded-full px-6 py-3 text-left text-on-surface-variant transition-transform active:scale-95 hover:bg-surface-container-high"
+        @click="$emit('show-shortcuts')"
+      >
+        <Icon name="keyboard" />
+        <span class="min-w-0 flex-1 text-label-md">Phím tắt</span>
+        <kbd class="shortcut-kbd !px-1.5 !py-0.5 !text-[10px]">?</kbd>
+      </button>
     </div>
   </aside>
 </template>

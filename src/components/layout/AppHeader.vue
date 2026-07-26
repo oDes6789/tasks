@@ -7,10 +7,11 @@
     >
       <Icon name="search" icon-class="text-outline" />
       <input
+        id="app-search"
         v-model="query"
         type="search"
         class="w-full border-none bg-transparent text-label-md placeholder:text-outline-variant focus:outline-none focus:ring-0"
-        placeholder="Search tasks, teams, or OKRs..."
+        placeholder="Tìm kiếm… ( / )"
         @keyup.enter="emit('search', query)"
       />
     </div>
