@@ -152,6 +152,13 @@
                   >
                     {{ row.detail }}
                   </span>
+                  <span
+                    v-if="row.item?.createdBy"
+                    class="text-[10px] text-outline"
+                    :title="`Người tạo: ${row.item.createdBy}`"
+                  >
+                    Tạo bởi {{ row.item.createdBy }}
+                  </span>
                   <span v-if="row.item" class="text-[10px] tabular-nums text-outline">
                     {{ barTooltipTime(row) }}
                   </span>
@@ -307,6 +314,7 @@ interface DayPlanItem {
   sortOrder: number;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
+  createdBy?: string;
 }
 
 interface PlanDayMeta {
@@ -633,7 +641,8 @@ async function loadBoard() {
     items.value = board.items.map((it) => ({
       ...it,
       reminderEnabled: Boolean(it.reminderEnabled),
-      reminderMinutesBefore: it.reminderMinutesBefore ?? DEFAULT_REMINDER_MINUTES
+      reminderMinutesBefore: it.reminderMinutesBefore ?? DEFAULT_REMINDER_MINUTES,
+      createdBy: it.createdBy ?? ""
     }));
     checkReminders();
   } catch (err) {

@@ -10,6 +10,29 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src")
     }
   },
+  optimizeDeps: {
+    include: [
+      "vue",
+      "vue-router",
+      "pinia",
+      "@primeuix/themes",
+      "@primeuix/themes/aura",
+      "primevue/config",
+      "primevue/toastservice",
+      "primevue/confirmationservice",
+      "primevue/toast",
+      "primevue/confirmdialog",
+      "primevue/datepicker",
+      "primevue/dialog",
+      "primevue/inputtext",
+      "primevue/select",
+      "primevue/multiselect",
+      "primevue/textarea",
+      "primevue/chip",
+      "primevue/useconfirm",
+      "primevue/usetoast"
+    ]
+  },
   build: {
     outDir: "dist/client",
     emptyOutDir: true

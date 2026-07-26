@@ -59,6 +59,7 @@ import Icon from "@/components/Icon.vue";
 
 defineEmits<{
   "new-task": [];
+  "show-shortcuts": [];
 }>();
 
 const route = useRoute();
@@ -70,8 +71,8 @@ const mainLinks = [
   { to: "/ke-hoach", label: "Kế hoạch ngày", icon: "calendar_month" },
   { to: "/lich-hop", label: "Lịch họp", icon: "event" },
   { to: "/nghi-thu-7", label: "Nghỉ Thứ 7", icon: "event_busy" },
-  { to: "/okrs", label: "OKR Management", icon: "track_changes" },
-  { to: "/team", label: "Team Directory", icon: "group" }
+  { to: "/nhan-su", label: "Quản lý nhân sự", icon: "group" },
+  { to: "/okrs", label: "OKR Management", icon: "track_changes" }
 ];
 
 const secondaryLinks = [

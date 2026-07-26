@@ -9,7 +9,44 @@ export interface LeavePerson {
   brand: LeaveBrand;
   /** Team lead for IM (IELTSMentor) or EC (ClassUp) */
   isTeamLead: boolean;
+  avatar?: string | null;
 }
+
+/** Infer brand from department / account-type text. */
+export function inferLeaveBrand(raw: string | null | undefined): LeaveBrand {
+  const hay = String(raw ?? "").toLowerCase();
+  if (/ielts\s*mentor|\bielts\b|\bim\b/.test(hay)) return "im";
+  if (/class\s*up|\bclassup\b|\bec\b|english\s*center/.test(hay)) return "ec";
+  return "general";
+}
+
+/** True when account type / role text indicates team lead (trưởng nhóm). */
+export function isTeamLeadLabel(raw: string | null | undefined): boolean {
+  const hay = String(raw ?? "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  return /trưởng\s*nhóm|truong\s*nhom|team\s*lead|teamlead|leader|\btn\b/.test(hay);
+}
+
+export function isLeaveBrand(value: unknown): value is LeaveBrand {
+  return value === "general" || value === "im" || value === "ec";
+}
+
+/** Team lead if account type name/slug matches teamlead / trưởng nhóm. */
+export function isTeamLeadAccount(position: {
+  accountType?: { name?: string | null; slug?: string | null } | null;
+} | null | undefined): boolean {
+  if (!position?.accountType) return false;
+  return (
+    isTeamLeadLabel(position.accountType.name) || isTeamLeadLabel(position.accountType.slug)
+  );
+}
+
+export const LEAVE_BRAND_OPTIONS: { value: LeaveBrand; label: string }[] = [
+  { value: "general", label: "Ban điều hành" },
+  { value: "im", label: "IELTSMentor" },
+  { value: "ec", label: "ClassUp" }
+];
 
 export interface SaturdayLeaveEntry {
   id: number;
@@ -163,9 +200,10 @@ export interface BrandDayStats {
 export function calcBrandDayStats(
   brand: LeaveBrand,
   workDate: string,
-  statusByPerson: Map<string, LeaveStatus | null>
+  statusByPerson: Map<string, LeaveStatus | null>,
+  roster: LeavePerson[] = SATURDAY_LEAVE_ROSTER
 ): BrandDayStats {
-  const people = SATURDAY_LEAVE_ROSTER.filter((p) => p.brand === brand);
+  const people = roster.filter((p) => p.brand === brand);
   let off = 0;
   let working = 0;
   let unset = 0;

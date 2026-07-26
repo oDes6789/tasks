@@ -167,7 +167,7 @@
           <Select
             v-if="isFieldEditing(row, 'person')"
             :modelValue="row.personName || null"
-            :options="personnel"
+            :options="personOptionsFor(row)"
             optionLabel="name"
             optionValue="name"
             filter
@@ -186,6 +186,13 @@
                 :avatar="row.personAvatar"
               />
               <span v-else class="text-sm text-on-surface-variant">ㅤ</span>
+              <p
+                v-if="row.createdBy"
+                class="text-[10px] text-outline"
+                :title="`Người tạo: ${row.createdBy}`"
+              >
+                Tạo bởi {{ row.createdBy }}
+              </p>
               <RouterLink
                 v-if="row.personName && !row.isDraft"
                 :to="{
@@ -764,6 +771,7 @@ interface GoalRow {
   status: string;
   progress: string;
   nextFocus: string;
+  createdBy?: string;
   isDraft?: boolean;
 }
 
@@ -1089,16 +1097,7 @@ async function applyExpandEditor() {
   await persistRow(row, { quiet: false });
 }
 
-const defaultPersonnel: PersonnelOption[] = [
-  { name: "Ms. Hoàng Thị", avatar: null },
-  { name: "Ms. Hà Thu", avatar: null },
-  { name: "Ms. Kim Bắc", avatar: null },
-  { name: "Mr. Đức Anh", avatar: null },
-  { name: "Mr. Tiến Dũng", avatar: null },
-  { name: "Ms. Thu Hà", avatar: null },
-  { name: "Mr. Minh Quân", avatar: null },
-  { name: "Ms. Lan Anh", avatar: null }
-];
+const defaultPersonnel: PersonnelOption[] = [];
 
 function createEmptyDraft(): GoalRow {
   return {
@@ -1109,6 +1108,7 @@ function createEmptyDraft(): GoalRow {
     status: "pending",
     progress: "",
     nextFocus: "",
+    createdBy: "",
     isDraft: true
   };
 }
@@ -1150,6 +1150,7 @@ function hydrateRow(row: GoalRow): GoalRow {
     goals: row.goals ?? "",
     progress: row.progress ?? "",
     nextFocus: row.nextFocus ?? "",
+    createdBy: row.createdBy ?? "",
     isDraft: false
   };
   markClean(hydrated);
@@ -1224,6 +1225,18 @@ function setPerson(row: GoalRow, name: string | null | undefined) {
   row.personName = personName;
   row.personAvatar = person?.avatar ?? null;
   if (!row.isDraft) scheduleAutoSave(row);
+}
+
+/** Keep current person in the dropdown even if they haven't logged in yet. */
+function personOptionsFor(row: GoalRow): PersonnelOption[] {
+  const byName = new Map(personnel.value.map((p) => [p.name, p]));
+  if (row.personName && !byName.has(row.personName)) {
+    byName.set(row.personName, {
+      name: row.personName,
+      avatar: row.personAvatar
+    });
+  }
+  return Array.from(byName.values());
 }
 
 const URL_IN_TEXT_RE = /https?:\/\/[^\s<>"'）】\]]+/gi;

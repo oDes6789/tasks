@@ -56,6 +56,11 @@ const router = createRouter({
           path: "nghi-thu-7",
           name: "saturday-leave",
           component: () => import("@/pages/SaturdayLeavePage.vue")
+        },
+        {
+          path: "nhan-su",
+          name: "personnel",
+          component: () => import("@/pages/PersonnelPage.vue")
         }
       ]
     },

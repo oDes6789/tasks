@@ -4,7 +4,7 @@
       <div class="min-w-0">
         <h2 class="mb-1 text-headline-lg text-primary">ĐĂNG KÝ NGHỈ THỨ 7</h2>
         <p class="text-body-md text-on-surface-variant">
-          Nhân sự chọn lịch làm / nghỉ từng Thứ 7 · Mỗi người nghỉ không quá 50% số T7 trong tháng
+          Danh sách theo nhân sự đã đăng nhập và trưởng nhóm · Mỗi người nghỉ không quá 50% số T7 trong tháng
         </p>
       </div>
 
@@ -125,6 +125,12 @@
         Đang tải lịch nghỉ…
       </div>
       <div
+        v-else-if="!roster.length"
+        class="px-4 py-16 text-center text-sm text-on-surface-variant"
+      >
+        Chưa có tài khoản nào được bật theo dõi nghỉ Thứ 7. Teamlead hãy bật ở trang Quản lý nhân sự.
+      </div>
+      <div
         v-else-if="!saturdays.length"
         class="px-4 py-16 text-center text-sm text-on-surface-variant"
       >
@@ -183,7 +189,13 @@
                 <td class="leave-td leave-td-stt">{{ section.startIndex + idx }}</td>
                 <td class="leave-td leave-td-name">
                   <div class="leave-person">
-                    <span class="leave-avatar" :data-brand="person.brand">
+                    <img
+                      v-if="person.avatar"
+                      :src="person.avatar"
+                      :alt="person.name"
+                      class="leave-avatar-img"
+                    />
+                    <span v-else class="leave-avatar" :data-brand="person.brand">
                       {{ initials(person.name) }}
                     </span>
                     <div class="leave-person-meta">
@@ -213,6 +225,7 @@
                     class="leave-seg"
                     role="group"
                     :aria-label="`${person.name} ${formatShortDate(day)}`"
+                    :title="leaveCellTitle(person.name, day)"
                   >
                     <button
                       v-for="opt in selectOptions"
@@ -225,7 +238,7 @@
                         'is-busy': isSaving(person.name, day)
                       }"
                       :disabled="isSaving(person.name, day)"
-                      :title="opt.label"
+                      :title="leaveCellTitle(person.name, day) || opt.label"
                       @click="onStatusChange(person.name, day, opt.value)"
                     >
                       {{ statusAbbrev(opt.value) }}
@@ -256,10 +269,10 @@ import {
   LEAVE_STATUS_OPTIONS,
   monthLabelVi,
   resolveMonthKey,
-  SATURDAY_LEAVE_ROSTER,
   shiftMonth,
   toMonthKey,
   type LeaveBrand,
+  type LeavePerson,
   type LeaveStatus,
   type SaturdayLeaveEntry
 } from "@/lib/saturdayLeave";
@@ -270,6 +283,7 @@ const auth = useAuthStore();
 const monthKey = ref(toMonthKey(new Date()));
 const monthDate = ref<Date>(new Date());
 const saturdays = ref<string[]>([]);
+const roster = ref<LeavePerson[]>([]);
 const entries = ref<SaturdayLeaveEntry[]>([]);
 const loading = ref(false);
 const savingKeys = ref<Set<string>>(new Set());
@@ -288,27 +302,29 @@ const monthTitle = computed(() => monthLabelVi(monthKey.value));
 const sections = computed(() => {
   const brands: LeaveBrand[] = ["general", "im", "ec"];
   let cursor = 1;
-  return brands.map((brand) => {
-    const people = SATURDAY_LEAVE_ROSTER.filter((p) => p.brand === brand);
-    const startIndex = cursor;
-    cursor += people.length;
-    return {
-      brand,
-      people,
-      startIndex,
-      showMetric: brand === "im" || brand === "ec",
-      metricTitle: BRAND_META[brand].metricTitle,
-      metricHint: BRAND_META[brand].metricHint
-    };
-  });
+  return brands
+    .map((brand) => {
+      const people = roster.value.filter((p) => p.brand === brand);
+      const startIndex = cursor;
+      cursor += people.length;
+      return {
+        brand,
+        people,
+        startIndex,
+        showMetric: brand === "im" || brand === "ec",
+        metricTitle: BRAND_META[brand].metricTitle,
+        metricHint: BRAND_META[brand].metricHint
+      };
+    })
+    .filter((section) => section.people.length > 0);
 });
 
 const selectOptions = LEAVE_STATUS_OPTIONS;
 
-const totalSlots = computed(() => saturdays.value.length * SATURDAY_LEAVE_ROSTER.length);
+const totalSlots = computed(() => saturdays.value.length * roster.value.length);
 const filledCount = computed(() => {
   let n = 0;
-  for (const person of SATURDAY_LEAVE_ROSTER) {
+  for (const person of roster.value) {
     for (const day of saturdays.value) {
       if (statusMap.value.has(`${person.name}::${day}`)) n += 1;
     }
@@ -332,21 +348,41 @@ function getStatus(personName: string, workDate: string): LeaveStatus | null {
   return statusMap.value.get(cellKey(personName, workDate)) ?? null;
 }
 
+function getLeaveEntry(personName: string, workDate: string) {
+  return entries.value.find((e) => e.personName === personName && e.workDate === workDate);
+}
+
+function leaveCellTitle(personName: string, workDate: string) {
+  const entry = getLeaveEntry(personName, workDate);
+  if (!entry?.updatedBy) return undefined;
+  const when = entry.updatedAt
+    ? new Date(entry.updatedAt).toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    : "";
+  return when
+    ? `Cập nhật bởi ${entry.updatedBy} · ${when}`
+    : `Cập nhật bởi ${entry.updatedBy}`;
+}
+
 function isSaving(personName: string, workDate: string) {
   return savingKeys.value.has(cellKey(personName, workDate));
 }
 
 function brandStats(workDate: string, brand: LeaveBrand) {
   const map = new Map<string, LeaveStatus | null>();
-  for (const person of SATURDAY_LEAVE_ROSTER) {
+  for (const person of roster.value) {
     map.set(cellKey(person.name, workDate), getStatus(person.name, workDate));
   }
-  return calcBrandDayStats(brand, workDate, map);
+  return calcBrandDayStats(brand, workDate, map, roster.value);
 }
 
 const statusMapNullable = computed(() => {
   const map = new Map<string, LeaveStatus | null>();
-  for (const person of SATURDAY_LEAVE_ROSTER) {
+  for (const person of roster.value) {
     for (const day of saturdays.value) {
       map.set(cellKey(person.name, day), getStatus(person.name, day));
     }
@@ -359,7 +395,7 @@ function personStats(personName: string) {
 }
 
 const overLimitPeople = computed(() =>
-  SATURDAY_LEAVE_ROSTER.map((p) => personStats(p.name)).filter((s) => s.overLimit)
+  roster.value.map((p) => personStats(p.name)).filter((s) => s.overLimit)
 );
 
 const maxOffHint = computed(() => {
@@ -425,10 +461,12 @@ async function loadBoard() {
     const data = (await res.json()) as {
       month: string;
       saturdays: string[];
+      roster?: LeavePerson[];
       entries: SaturdayLeaveEntry[];
     };
     monthKey.value = resolveMonthKey(data.month);
     saturdays.value = data.saturdays;
+    roster.value = Array.isArray(data.roster) ? data.roster : [];
     entries.value = data.entries;
     syncMonthDateFromKey();
   } catch (err) {
@@ -881,6 +919,13 @@ onMounted(() => {
   border-radius: 999px;
   font-size: 9px;
   font-weight: 800;
+}
+.leave-avatar-img {
+  height: 26px;
+  width: 26px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  object-fit: cover;
 }
 .leave-avatar[data-brand="im"] { background: #e0f2fe; color: #0369a1; }
 .leave-avatar[data-brand="ec"] { background: #f3e8ff; color: #7e22ce; }

@@ -196,6 +196,13 @@
                 <p class="text-sm font-semibold text-on-surface">
                   {{ task.item || "ㅤ" }}
                 </p>
+                <p
+                  v-if="task.createdBy"
+                  class="mt-1 text-[10px] text-outline"
+                  :title="`Người tạo: ${task.createdBy}`"
+                >
+                  Tạo bởi {{ task.createdBy }}
+                </p>
                 <button
                   v-if="!task.isDraft"
                   type="button"
@@ -290,7 +297,7 @@
                 <MultiSelect
                   v-if="isFieldEditing(task, 'pics')"
                   :modelValue="picNames(task)"
-                  :options="personnel"
+                  :options="picOptionsFor(task)"
                   optionLabel="name"
                   optionValue="name"
                   display="chip"
@@ -506,6 +513,7 @@ interface WeeklyTask {
   kpi: string;
   progress: number | null;
   progressNote: string | null;
+  createdBy?: string;
   isDraft?: boolean;
 }
 
@@ -652,6 +660,7 @@ function createEmptyDraft(groupId: number): WeeklyTask {
     kpi: "",
     progress: null,
     progressNote: "",
+    createdBy: "",
     isDraft: true
   };
 }
@@ -755,13 +764,7 @@ const filteredMatchCount = computed(() =>
   groups.value.reduce((sum, g) => sum + filteredTaskCount(g), 0)
 );
 
-const defaultPersonnel: Pic[] = [
-  { name: "Ms. Kim Bắc", avatar: null },
-  { name: "Mr. Tiến Dũng", avatar: null },
-  { name: "Ms. Thu Hà", avatar: null },
-  { name: "Mr. Minh Quân", avatar: null },
-  { name: "Ms. Lan Anh", avatar: null }
-];
+const defaultPersonnel: Pic[] = [];
 
 function isBlankDraft(
   task: Pick<WeeklyTask, "item" | "objective" | "dod" | "progressNote" | "pics">
@@ -780,6 +783,7 @@ function hydrateTask(task: WeeklyTask): WeeklyTask {
     ...task,
     kpi: task.kpi ?? "",
     progressNote: task.progressNote ?? "",
+    createdBy: task.createdBy ?? "",
     isDraft: false
   };
   markClean(hydrated);
@@ -837,6 +841,15 @@ function isRowEditing(task: WeeklyTask) {
 
 function picNames(task: WeeklyTask) {
   return task.pics.map((p) => p.name);
+}
+
+/** Keep already-selected PIC names in the dropdown even if they haven't logged in. */
+function picOptionsFor(task: WeeklyTask): Pic[] {
+  const byName = new Map(personnel.value.map((p) => [p.name, p]));
+  for (const pic of task.pics) {
+    if (!byName.has(pic.name)) byName.set(pic.name, pic);
+  }
+  return Array.from(byName.values());
 }
 
 function picInitials(name: string) {

@@ -73,6 +73,9 @@ export async function migrate(): Promise<void> {
 
     UPDATE weekly_tasks SET kpi = '' WHERE kpi IN ('none') OR kpi IS NULL;
 
+    ALTER TABLE weekly_tasks
+      ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT '';
+
     CREATE TABLE IF NOT EXISTS personal_goals (
       id SERIAL PRIMARY KEY,
       week_start DATE NOT NULL,
@@ -92,6 +95,9 @@ export async function migrate(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_personal_goals_week_sort
       ON personal_goals (week_start, sort_order, id);
+
+    ALTER TABLE personal_goals
+      ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT '';
 
     CREATE TABLE IF NOT EXISTS personal_day_plans (
       id SERIAL PRIMARY KEY,
@@ -119,6 +125,9 @@ export async function migrate(): Promise<void> {
 
     ALTER TABLE personal_day_plans
       ADD COLUMN IF NOT EXISTS reminder_minutes_before INTEGER NOT NULL DEFAULT 15;
+
+    ALTER TABLE personal_day_plans
+      ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT '';
 
     UPDATE personal_day_plans
     SET end_date = plan_date
@@ -184,9 +193,19 @@ export async function migrate(): Promise<void> {
       employee_code INTEGER,
       parent_id INTEGER,
       manager_json JSONB,
+      position_json JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE app_users
+      ADD COLUMN IF NOT EXISTS position_json JSONB;
+
+    ALTER TABLE app_users
+      ADD COLUMN IF NOT EXISTS leave_brand TEXT;
+
+    ALTER TABLE app_users
+      ADD COLUMN IF NOT EXISTS saturday_leave_tracked BOOLEAN NOT NULL DEFAULT FALSE;
 
     CREATE INDEX IF NOT EXISTS idx_app_users_edutalk
       ON app_users (edutalk_user_id);

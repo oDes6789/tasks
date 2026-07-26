@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { authHeaders, clearStoredToken, getStoredToken, setStoredToken } from "@/lib/auth";
 import { getOAuthRedirectUri } from "@/lib/edutalkAuth";
+import { isTeamLeadAccount, type LeaveBrand } from "@/lib/saturdayLeave";
 
 export interface AuthManager {
   id: number;
@@ -9,6 +10,11 @@ export interface AuthManager {
   email: string | null;
   avatarUrl: string | null;
   employeeCode: number | null;
+}
+
+export interface AuthPosition {
+  accountType: { id: number; name: string; slug: string | null } | null;
+  department: string | null;
 }
 
 export interface AuthUser {
@@ -19,6 +25,10 @@ export interface AuthUser {
   employeeCode: number | null;
   parentId: number | null;
   manager: AuthManager | null;
+  position: AuthPosition | null;
+  leaveBrand: LeaveBrand | null;
+  saturdayLeaveTracked: boolean;
+  isTeamLead?: boolean;
 }
 
 export const useAuthStore = defineStore("auth", () => {
@@ -26,6 +36,9 @@ export const useAuthStore = defineStore("auth", () => {
   const isAuthLoading = ref(true);
 
   const isAuthenticated = computed(() => !!user.value);
+  const isTeamLead = computed(
+    () => Boolean(user.value?.isTeamLead) || isTeamLeadAccount(user.value?.position)
+  );
 
   async function restoreSession() {
     isAuthLoading.value = true;
@@ -97,6 +110,7 @@ export const useAuthStore = defineStore("auth", () => {
     user,
     isAuthLoading,
     isAuthenticated,
+    isTeamLead,
     restoreSession,
     loginWithEdutalkCode,
     logout

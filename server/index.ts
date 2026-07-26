@@ -5,9 +5,13 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { createSessionToken, verifySessionToken } from "./sessionToken";
 import {
+  deleteUserById,
   getUserById,
+  isAppUserTeamLead,
+  listPublicUsers,
   loadUsersFromDb,
   toPublicUser,
+  updateUserLeaveSettings,
   upsertUserFromEdutalk,
   type EdutalkUserInput
 } from "./users";
@@ -40,6 +44,7 @@ import {
 } from "./saturdayLeaveRepo";
 import { resolveWeekStart } from "../src/lib/week";
 import { DEFAULT_MEETING_OWNER } from "../src/lib/meetings";
+import { isLeaveBrand, type LeaveBrand } from "../src/lib/saturdayLeave";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -210,7 +215,9 @@ app.post("/api/auth/login/edutalk", async (req, res) => {
       employeeCode: edutalkUser.employeeCode,
       image: edutalkUser.image,
       parent_id: edutalkUser.parent_id,
-      manager: edutalkUser.manager
+      manager: edutalkUser.manager,
+      account_type: edutalkUser.account_type,
+      department: edutalkUser.department
     });
     const sessionToken = createSessionToken(user.id, SESSION_TTL_MS);
     res.json({ token: sessionToken, user: toPublicUser(user) });
@@ -379,7 +386,8 @@ app.post("/api/tasks", async (req, res) => {
       status: req.body?.status,
       kpi: req.body?.kpi,
       progress: req.body?.progress,
-      progressNote: req.body?.progressNote
+      progressNote: req.body?.progressNote,
+      createdBy: user.name || user.email || ""
     });
     res.status(201).json({ task, weekStart: week.weekStart });
   } catch (err) {
@@ -474,7 +482,8 @@ app.post("/api/personal-goals", async (req, res) => {
       goals: req.body?.goals,
       status: req.body?.status,
       progress: req.body?.progress,
-      nextFocus: req.body?.nextFocus
+      nextFocus: req.body?.nextFocus,
+      createdBy: user.name || user.email || ""
     });
     res.status(201).json({ row, weekStart: week.weekStart });
   } catch (err) {
@@ -585,7 +594,8 @@ app.post("/api/day-plans", async (req, res) => {
       status: req.body?.status,
       sortOrder: req.body?.sortOrder,
       reminderEnabled: req.body?.reminderEnabled,
-      reminderMinutesBefore: req.body?.reminderMinutesBefore
+      reminderMinutesBefore: req.body?.reminderMinutesBefore,
+      createdBy: user.name || user.email || ""
     });
     res.status(201).json({ item });
   } catch (err) {
@@ -792,6 +802,106 @@ app.delete("/api/meetings/:id", async (req, res) => {
   }
 });
 
+app.get("/api/users", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  try {
+    res.json({ items: listPublicUsers() });
+  } catch (err) {
+    console.error("Failed to load users:", err);
+    res.status(500).json({ error: "Không tải được danh sách người dùng." });
+  }
+});
+
+app.patch("/api/users/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+  if (!isAppUserTeamLead(user)) {
+    return res.status(403).json({ error: "Chỉ tài khoản teamlead mới được chỉnh sửa." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "ID không hợp lệ." });
+  }
+
+  const body = (req.body ?? {}) as {
+    leaveBrand?: unknown;
+    saturdayLeaveTracked?: unknown;
+  };
+
+  const patch: {
+    leaveBrand?: LeaveBrand | null;
+    saturdayLeaveTracked?: boolean;
+  } = {};
+
+  if ("leaveBrand" in body) {
+    if (body.leaveBrand === null || body.leaveBrand === "") {
+      patch.leaveBrand = null;
+    } else if (isLeaveBrand(body.leaveBrand)) {
+      patch.leaveBrand = body.leaveBrand;
+    } else {
+      return res.status(400).json({ error: "Brand không hợp lệ." });
+    }
+  }
+
+  if ("saturdayLeaveTracked" in body) {
+    if (typeof body.saturdayLeaveTracked !== "boolean") {
+      return res.status(400).json({ error: "Giá trị theo dõi nghỉ Thứ 7 không hợp lệ." });
+    }
+    patch.saturdayLeaveTracked = body.saturdayLeaveTracked;
+  }
+
+  if (!("leaveBrand" in patch) && !("saturdayLeaveTracked" in patch)) {
+    return res.status(400).json({ error: "Không có dữ liệu cập nhật." });
+  }
+
+  try {
+    const updated = await updateUserLeaveSettings(id, patch);
+    if (!updated) {
+      return res.status(404).json({ error: "Không tìm thấy người dùng." });
+    }
+    res.json({ item: toPublicUser(updated) });
+  } catch (err) {
+    console.error("Failed to update user leave settings:", err);
+    res.status(500).json({ error: "Không cập nhật được tài khoản." });
+  }
+});
+
+app.delete("/api/users/:id", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+  if (!isAppUserTeamLead(user)) {
+    return res.status(403).json({ error: "Chỉ tài khoản teamlead mới được xóa." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "ID không hợp lệ." });
+  }
+  if (id === user.id) {
+    return res.status(400).json({ error: "Không thể xóa tài khoản đang đăng nhập." });
+  }
+
+  try {
+    const ok = await deleteUserById(id);
+    if (!ok) {
+      return res.status(404).json({ error: "Không tìm thấy người dùng." });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Failed to delete user:", err);
+    res.status(500).json({ error: "Không xóa được người dùng." });
+  }
+});
+
 app.get("/api/saturday-leave", async (req, res) => {
   const user = getSessionUser(req);
   if (!user) {
@@ -867,7 +977,12 @@ async function start() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       root,
-      server: { middlewareMode: true },
+      configFile: path.join(root, "vite.config.ts"),
+      server: {
+        middlewareMode: true,
+        // Force re-optimize when cache is stale / missing chunks after restarts.
+        force: process.env.VITE_FORCE_OPTIMIZE === "1"
+      },
       appType: "custom"
     });
 

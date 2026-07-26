@@ -1,5 +1,6 @@
 import { query } from "./db";
 import { CATEGORIES } from "./migrate";
+import { getPersonnelOptions } from "./personnel";
 import { formatDeadlineNote, formatWeekLabel, resolveWeekStart } from "../src/lib/week";
 
 export interface Pic {
@@ -17,6 +18,7 @@ export interface WeeklyTask {
   kpi: string;
   progress: number | null;
   progressNote: string | null;
+  createdBy: string;
 }
 
 export interface TaskGroup {
@@ -47,11 +49,7 @@ interface TaskRow {
   kpi: string;
   progress: number | null;
   progress_note: string | null;
-}
-
-interface PersonnelRow {
-  name: string;
-  avatar_url: string | null;
+  created_by: string | null;
 }
 
 function normalizePics(raw: Pic[] | null | undefined): Pic[] {
@@ -72,18 +70,19 @@ function mapTask(row: TaskRow): WeeklyTask {
     status: row.status,
     kpi: row.kpi === "none" ? "" : (row.kpi ?? ""),
     progress: row.progress,
-    progressNote: row.progress_note
+    progressNote: row.progress_note,
+    createdBy: row.created_by ?? ""
   };
 }
 
 const TASK_SELECT =
-  "id, category_id, item, objective, dod, pics, status, kpi, progress, progress_note";
+  "id, category_id, item, objective, dod, pics, status, kpi, progress, progress_note, COALESCE(created_by, '') AS created_by";
 
 export async function getTaskBoard(weekRaw: unknown): Promise<BoardPayload> {
   const week = resolveWeekStart(weekRaw);
 
-  const [personnelRes, tasksRes] = await Promise.all([
-    query<PersonnelRow>(`SELECT name, avatar_url FROM personnel ORDER BY id ASC`),
+  const [personnel, tasksRes] = await Promise.all([
+    getPersonnelOptions(),
     query<TaskRow>(
       `
       SELECT ${TASK_SELECT}
@@ -115,10 +114,7 @@ export async function getTaskBoard(weekRaw: unknown): Promise<BoardPayload> {
       weekLabel: week.weekLabel || formatWeekLabel(week.start),
       deadlineNote: formatDeadlineNote(week.start)
     },
-    personnel: personnelRes.rows.map((p) => ({
-      name: p.name,
-      avatar: p.avatar_url
-    })),
+    personnel,
     groups
   };
 }
@@ -134,6 +130,7 @@ export async function createWeeklyTask(input: {
   kpi?: string;
   progress?: number | null;
   progressNote?: string | null;
+  createdBy?: string;
 }): Promise<WeeklyTask> {
   const sortRes = await query<{ next_sort: number }>(
     `
@@ -146,13 +143,14 @@ export async function createWeeklyTask(input: {
 
   const sortOrder = sortRes.rows[0]?.next_sort ?? 0;
   const pics = JSON.stringify(input.pics ?? []);
+  const createdBy = (input.createdBy ?? "").trim().slice(0, 120);
 
   const res = await query<TaskRow>(
     `
     INSERT INTO weekly_tasks (
-      week_start, category_id, item, objective, dod, pics, status, kpi, progress, progress_note, sort_order
+      week_start, category_id, item, objective, dod, pics, status, kpi, progress, progress_note, sort_order, created_by
     )
-    VALUES ($1::date, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11)
+    VALUES ($1::date, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12)
     RETURNING ${TASK_SELECT}
     `,
     [
@@ -166,7 +164,8 @@ export async function createWeeklyTask(input: {
       input.kpi ?? "",
       input.progress ?? null,
       input.progressNote ?? null,
-      sortOrder
+      sortOrder,
+      createdBy
     ]
   );
 

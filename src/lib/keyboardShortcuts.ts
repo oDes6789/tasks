@@ -53,6 +53,13 @@ export const NAV_SHORTCUTS: ShortcutDef[] = [
     label: "Nghỉ Thứ 7",
     group: "Điều hướng",
     action: { type: "navigate", to: "/nghi-thu-7" }
+  },
+  {
+    id: "go-personnel",
+    keys: ["F7"],
+    label: "Quản lý nhân sự",
+    group: "Điều hướng",
+    action: { type: "navigate", to: "/nhan-su" }
   }
 ];
 

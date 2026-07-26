@@ -1,4 +1,5 @@
 import { query } from "./db";
+import { getPersonnelOptions } from "./personnel";
 import { formatDeadlineNote, formatWeekLabel, resolveWeekStart } from "../src/lib/week";
 
 export interface PersonnelOption {
@@ -14,6 +15,7 @@ export interface PersonalGoal {
   status: string;
   progress: string;
   nextFocus: string;
+  createdBy: string;
 }
 
 export interface PersonalGoalsBoard {
@@ -34,15 +36,11 @@ interface GoalRow {
   status: string;
   progress: string;
   next_focus: string;
-}
-
-interface PersonnelRow {
-  name: string;
-  avatar_url: string | null;
+  created_by: string | null;
 }
 
 const GOAL_SELECT =
-  "id, person_name, person_avatar, goals, status, progress, next_focus";
+  "id, person_name, person_avatar, goals, status, progress, next_focus, COALESCE(created_by, '') AS created_by";
 
 function mapGoal(row: GoalRow): PersonalGoal {
   return {
@@ -52,15 +50,16 @@ function mapGoal(row: GoalRow): PersonalGoal {
     goals: row.goals ?? "",
     status: row.status || "pending",
     progress: row.progress ?? "",
-    nextFocus: row.next_focus ?? ""
+    nextFocus: row.next_focus ?? "",
+    createdBy: row.created_by ?? ""
   };
 }
 
 export async function getPersonalGoalsBoard(weekRaw: unknown): Promise<PersonalGoalsBoard> {
   const week = resolveWeekStart(weekRaw);
 
-  const [personnelRes, goalsRes] = await Promise.all([
-    query<PersonnelRow>(`SELECT name, avatar_url FROM personnel ORDER BY id ASC`),
+  const [personnel, goalsRes] = await Promise.all([
+    getPersonnelOptions(),
     query<GoalRow>(
       `
       SELECT ${GOAL_SELECT}
@@ -78,10 +77,7 @@ export async function getPersonalGoalsBoard(weekRaw: unknown): Promise<PersonalG
       weekLabel: week.weekLabel || formatWeekLabel(week.start),
       deadlineNote: formatDeadlineNote(week.start)
     },
-    personnel: personnelRes.rows.map((p) => ({
-      name: p.name,
-      avatar: p.avatar_url
-    })),
+    personnel,
     rows: goalsRes.rows.map(mapGoal)
   };
 }
@@ -94,6 +90,7 @@ export async function createPersonalGoal(input: {
   status?: string;
   progress?: string;
   nextFocus?: string;
+  createdBy?: string;
 }): Promise<PersonalGoal> {
   const sortRes = await query<{ next_sort: number }>(
     `
@@ -105,13 +102,14 @@ export async function createPersonalGoal(input: {
   );
 
   const sortOrder = sortRes.rows[0]?.next_sort ?? 0;
+  const createdBy = (input.createdBy ?? "").trim().slice(0, 120);
 
   const res = await query<GoalRow>(
     `
     INSERT INTO personal_goals (
-      week_start, person_name, person_avatar, goals, status, progress, next_focus, sort_order
+      week_start, person_name, person_avatar, goals, status, progress, next_focus, sort_order, created_by
     )
-    VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING ${GOAL_SELECT}
     `,
     [
@@ -122,7 +120,8 @@ export async function createPersonalGoal(input: {
       input.status ?? "pending",
       input.progress ?? "",
       input.nextFocus ?? "",
-      sortOrder
+      sortOrder,
+      createdBy
     ]
   );
 

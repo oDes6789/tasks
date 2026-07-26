@@ -1,5 +1,6 @@
 import { query } from "./db";
 import { parseGoalItems } from "../src/lib/goalItems";
+import { getPersonnelOptions, resolvePersonAvatar } from "./personnel";
 import {
   addDays,
   formatDeadlineNote,
@@ -26,6 +27,7 @@ export interface DayPlanItem {
   sortOrder: number;
   reminderEnabled: boolean;
   reminderMinutesBefore: number;
+  createdBy: string;
 }
 
 export interface PlanSourceItem {
@@ -72,11 +74,7 @@ interface PlanRow {
   sort_order: number;
   reminder_enabled: boolean;
   reminder_minutes_before: number;
-}
-
-interface PersonnelRow {
-  name: string;
-  avatar_url: string | null;
+  created_by: string | null;
 }
 
 const WEEKDAY_LABELS = ["T2", "T3", "T4", "T5", "T6", "T7"] as const;
@@ -97,7 +95,8 @@ const PLAN_SELECT = `
   status,
   sort_order,
   COALESCE(reminder_enabled, FALSE) AS reminder_enabled,
-  COALESCE(reminder_minutes_before, 15) AS reminder_minutes_before
+  COALESCE(reminder_minutes_before, 15) AS reminder_minutes_before,
+  COALESCE(created_by, '') AS created_by
 `;
 
 function asIsoDate(value: string): string {
@@ -127,7 +126,8 @@ function mapItem(row: PlanRow): DayPlanItem {
     status: row.status || "pending",
     sortOrder: row.sort_order ?? 0,
     reminderEnabled: Boolean(row.reminder_enabled),
-    reminderMinutesBefore: clampReminderMinutes(row.reminder_minutes_before)
+    reminderMinutesBefore: clampReminderMinutes(row.reminder_minutes_before),
+    createdBy: row.created_by ?? ""
   };
 }
 
@@ -172,12 +172,9 @@ export async function getDayPlanBoard(
   const personName = String(personNameRaw ?? "").trim();
   if (!personName) throw new Error("PERSON_REQUIRED");
 
-  const [personnelRes, personRes, goalsRes, tasksRes, plansRes] = await Promise.all([
-    query<PersonnelRow>(`SELECT name, avatar_url FROM personnel ORDER BY id ASC`),
-    query<PersonnelRow>(
-      `SELECT name, avatar_url FROM personnel WHERE name = $1 LIMIT 1`,
-      [personName]
-    ),
+  const [personnel, personAvatar, goalsRes, tasksRes, plansRes] = await Promise.all([
+    getPersonnelOptions(),
+    resolvePersonAvatar(personName),
     query<{ id: number; goals: string; status: string }>(
       `
       SELECT id, goals, status
@@ -238,21 +235,16 @@ export async function getDayPlanBoard(
     });
   }
 
-  const person = personRes.rows[0];
-
   return {
     meta: {
       weekStart: week.weekStart,
       weekLabel: week.weekLabel || formatWeekLabel(week.start),
       deadlineNote: formatDeadlineNote(week.start),
       personName,
-      personAvatar: person?.avatar_url ?? null,
+      personAvatar,
       days: buildWeekDays(week.weekStart)
     },
-    personnel: personnelRes.rows.map((p) => ({
-      name: p.name,
-      avatar: p.avatar_url
-    })),
+    personnel,
     sources,
     items: plansRes.rows.map(mapItem)
   };
@@ -273,12 +265,14 @@ export async function createDayPlan(input: {
   sortOrder?: number;
   reminderEnabled?: boolean;
   reminderMinutesBefore?: number;
+  createdBy?: string;
 }): Promise<DayPlanItem> {
   const week = resolveWeekStart(input.weekStart);
   const personName = input.personName.trim();
   if (!personName) throw new Error("PERSON_REQUIRED");
 
   const { planDate, endDate } = normalizeRange(input.planDate, input.endDate, week.weekStart);
+  const createdBy = (input.createdBy ?? "").trim().slice(0, 120);
 
   const sortRes = await query<{ next_sort: number }>(
     `
@@ -294,9 +288,9 @@ export async function createDayPlan(input: {
     INSERT INTO personal_day_plans (
       week_start, person_name, plan_date, end_date, title, notes,
       start_minute, end_minute, source_type, source_key, status, sort_order,
-      reminder_enabled, reminder_minutes_before
+      reminder_enabled, reminder_minutes_before, created_by
     )
-    VALUES ($1::date, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    VALUES ($1::date, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     RETURNING ${PLAN_SELECT}
     `,
     [
@@ -313,7 +307,8 @@ export async function createDayPlan(input: {
       input.status ?? "pending",
       input.sortOrder ?? sortRes.rows[0]?.next_sort ?? 0,
       Boolean(input.reminderEnabled),
-      clampReminderMinutes(input.reminderMinutesBefore ?? 15)
+      clampReminderMinutes(input.reminderMinutesBefore ?? 15),
+      createdBy
     ]
   );
 
