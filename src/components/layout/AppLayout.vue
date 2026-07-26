@@ -11,16 +11,6 @@
 
       <AppFooter />
     </div>
-
-    <button
-      type="button"
-      class="fixed bottom-8 right-8 z-50 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-on-primary shadow-2xl transition-all hover:scale-110 active:scale-95"
-      aria-label="New task"
-      @click="onNewTask"
-    >
-      <Icon name="add" icon-class="text-3xl" />
-    </button>
-
     <KeyboardShortcutsHelp :open="helpOpen" @close="helpOpen = false" />
   </div>
 </template>

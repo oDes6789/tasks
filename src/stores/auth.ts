@@ -2,7 +2,11 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { authHeaders, clearStoredToken, getStoredToken, setStoredToken } from "@/lib/auth";
 import { getOAuthRedirectUri } from "@/lib/edutalkAuth";
-import { isTeamLeadAccount, type LeaveBrand } from "@/lib/saturdayLeave";
+import {
+  isDepartmentHeadAccount,
+  isTeamLeadAccount,
+  type LeaveBrand
+} from "@/lib/saturdayLeave";
 
 export interface AuthManager {
   id: number;
@@ -39,6 +43,10 @@ export const useAuthStore = defineStore("auth", () => {
   const isTeamLead = computed(
     () => Boolean(user.value?.isTeamLead) || isTeamLeadAccount(user.value?.position)
   );
+  /** Chỉ trưởng phòng. */
+  const isDepartmentHead = computed(() => isDepartmentHeadAccount(user.value?.position));
+  /** Chỉ trưởng phòng được chọn kế hoạch của nhân sự khác. */
+  const canSelectOtherPersonnel = computed(() => isDepartmentHead.value);
 
   async function restoreSession() {
     isAuthLoading.value = true;
@@ -111,6 +119,8 @@ export const useAuthStore = defineStore("auth", () => {
     isAuthLoading,
     isAuthenticated,
     isTeamLead,
+    isDepartmentHead,
+    canSelectOtherPersonnel,
     restoreSession,
     loginWithEdutalkCode,
     logout

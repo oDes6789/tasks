@@ -1,5 +1,6 @@
 import { query } from "./db";
 import {
+  isDepartmentHeadAccount,
   isLeaveBrand,
   isTeamLeadAccount,
   type LeaveBrand
@@ -303,6 +304,53 @@ export function getAllAppUsers(): AppUser[] {
 export function isAppUserTeamLead(user: AppUser | PublicUser | null | undefined): boolean {
   if (!user) return false;
   return isTeamLeadAccount(user.position);
+}
+
+export function isAppUserDepartmentHead(user: AppUser | PublicUser | null | undefined): boolean {
+  if (!user) return false;
+  return isDepartmentHeadAccount(user.position);
+}
+
+/** Fuzzy name match (handles Mr./Ms. prefixes and partial overlap). */
+export function personNamesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = String(a ?? "").trim().toLowerCase();
+  const right = String(b ?? "").trim().toLowerCase();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const leftBare = left.replace(/^m[rs]\.\s*/i, "");
+  const rightBare = right.replace(/^m[rs]\.\s*/i, "");
+  if (leftBare === rightBare) return true;
+  return right.includes(left) || left.includes(rightBare) || right.includes(leftBare);
+}
+
+export function findAppUserByName(name: string | null | undefined): AppUser | null {
+  const target = String(name ?? "").trim();
+  if (!target) return null;
+  return getAllAppUsers().find((u) => personNamesMatch(u.name, target)) ?? null;
+}
+
+/** True when createdBy refers to a logged-in trưởng phòng. */
+export function isCreatedByDepartmentHead(createdBy: string | null | undefined): boolean {
+  const creator = findAppUserByName(createdBy);
+  return creator ? isAppUserDepartmentHead(creator) : false;
+}
+
+/** True when actor may manage this person's records (self or trưởng phòng). */
+export function canManagePersonRecord(
+  actor: AppUser | PublicUser | null | undefined,
+  personName: string
+): boolean {
+  if (!actor) return false;
+  if (isAppUserDepartmentHead(actor)) return true;
+  return personNamesMatch(actor.name, personName);
+}
+
+/** True when actor may edit this person's Saturday leave (self or trưởng phòng). */
+export function canEditSaturdayLeaveFor(
+  actor: AppUser | PublicUser | null | undefined,
+  personName: string
+): boolean {
+  return canManagePersonRecord(actor, personName);
 }
 
 export interface PersonnelOption {

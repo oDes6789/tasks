@@ -20,16 +20,6 @@
       </RouterLink>
     </nav>
 
-    <div class="mb-stack-md px-4">
-      <button
-        type="button"
-        class="w-full rounded-full bg-primary py-4 text-label-md text-on-primary shadow-lg transition-all hover:brightness-110"
-        @click="$emit('new-task')"
-      >
-        New Task
-      </button>
-    </div>
-
     <div class="flex flex-col gap-2 border-t border-surface-container-highest pt-stack-sm">
       <RouterLink
         v-for="item in secondaryLinks"
@@ -54,8 +44,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import Icon from "@/components/Icon.vue";
+import { useAuthStore } from "@/stores/auth";
 
 defineEmits<{
   "new-task": [];
@@ -63,21 +55,30 @@ defineEmits<{
 }>();
 
 const route = useRoute();
+const auth = useAuthStore();
 
-const mainLinks = [
+const allMainLinks = [
   { to: "/", label: "Dashboard", icon: "dashboard" },
   { to: "/tasks", label: "Mục tiêu tuần", icon: "assignment" },
   { to: "/muc-tieu-ca-nhan", label: "Mục tiêu cá nhân", icon: "person" },
   { to: "/ke-hoach", label: "Kế hoạch ngày", icon: "calendar_month" },
   { to: "/lich-hop", label: "Lịch họp", icon: "event" },
   { to: "/nghi-thu-7", label: "Nghỉ Thứ 7", icon: "event_busy" },
-  { to: "/nhan-su", label: "Quản lý nhân sự", icon: "group" },
-  { to: "/okrs", label: "OKR Management", icon: "track_changes" }
+  {
+    to: "/nhan-su",
+    label: "Quản lý nhân sự",
+    icon: "group",
+    requiresDepartmentHead: true
+  }
 ];
 
-const secondaryLinks = [
-  { to: "/settings", label: "Settings", icon: "settings" },
-  { to: "/support", label: "Support", icon: "help" }
+const mainLinks = computed(() =>
+  allMainLinks.filter((item) => !item.requiresDepartmentHead || auth.isDepartmentHead)
+);
+
+const secondaryLinks: Record<string, any>[] = [
+  // { to: "/settings", label: "Settings", icon: "settings" },
+  // { to: "/support", label: "Support", icon: "help" }
 ];
 
 function isActive(to: string) {

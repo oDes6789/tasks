@@ -16,18 +16,13 @@
       />
     </div>
 
-    <div class="flex items-center gap-4">
-      <button
-        type="button"
-        class="p-2 text-on-surface-variant transition-colors hover:text-primary"
-        aria-label="Notifications"
-      >
-        <Icon name="notifications" />
-      </button>
+    <div class="relative flex items-center gap-4">
+      <NotificationBell />
       <button
         type="button"
         class="p-2 text-on-surface-variant transition-colors hover:text-primary"
         aria-label="Calendar"
+        @click="router.push('/ke-hoach')"
       >
         <Icon name="calendar_today" />
       </button>
@@ -37,7 +32,7 @@
       <button
         type="button"
         class="flex items-center gap-3 rounded-full px-4 py-2 transition-colors hover:bg-surface-container"
-        @click="menuOpen = !menuOpen"
+        @click.stop="menuOpen = !menuOpen"
       >
         <img
           :src="avatarSrc"
@@ -50,7 +45,8 @@
 
       <div
         v-if="menuOpen"
-        class="absolute right-6 top-14 z-50 min-w-48 rounded-2xl border border-surface-container bg-white p-2 ambient-shadow-lg"
+        class="absolute right-0 top-14 z-50 min-w-48 rounded-2xl border border-surface-container bg-white p-2 ambient-shadow-lg"
+        @click.stop
       >
         <p class="px-3 py-2 text-xs text-on-surface-variant">{{ userEmail }}</p>
         <button
@@ -70,13 +66,16 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import Icon from "@/components/Icon.vue";
+import NotificationBell from "./NotificationBell.vue";
 import { useAuthStore } from "@/stores/auth";
+import { useNoticesStore } from "@/stores/notices";
 
 const emit = defineEmits<{
   search: [query: string];
 }>();
 
 const auth = useAuthStore();
+const notices = useNoticesStore();
 const router = useRouter();
 const query = ref("");
 const menuOpen = ref(false);
@@ -91,6 +90,7 @@ const avatarSrc = computed(
 
 async function onLogout() {
   menuOpen.value = false;
+  notices.reset();
   await auth.logout();
   router.push({ name: "login" });
 }

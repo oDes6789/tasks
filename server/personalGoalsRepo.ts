@@ -1,6 +1,7 @@
 import { query } from "./db";
 import { getPersonnelOptions } from "./personnel";
 import { formatDeadlineNote, formatWeekLabel, resolveWeekStart } from "../src/lib/week";
+import { isCreatedByDepartmentHead } from "./users";
 
 export interface PersonnelOption {
   name: string;
@@ -16,6 +17,8 @@ export interface PersonalGoal {
   progress: string;
   nextFocus: string;
   createdBy: string;
+  /** True when creator is trưởng phòng — staff cannot delete. */
+  createdByDepartmentHead: boolean;
 }
 
 export interface PersonalGoalsBoard {
@@ -43,6 +46,7 @@ const GOAL_SELECT =
   "id, person_name, person_avatar, goals, status, progress, next_focus, COALESCE(created_by, '') AS created_by";
 
 function mapGoal(row: GoalRow): PersonalGoal {
+  const createdBy = row.created_by ?? "";
   return {
     id: row.id,
     personName: row.person_name ?? "",
@@ -51,7 +55,8 @@ function mapGoal(row: GoalRow): PersonalGoal {
     status: row.status || "pending",
     progress: row.progress ?? "",
     nextFocus: row.next_focus ?? "",
-    createdBy: row.created_by ?? ""
+    createdBy,
+    createdByDepartmentHead: isCreatedByDepartmentHead(createdBy)
   };
 }
 
@@ -80,6 +85,19 @@ export async function getPersonalGoalsBoard(weekRaw: unknown): Promise<PersonalG
     personnel,
     rows: goalsRes.rows.map(mapGoal)
   };
+}
+
+export async function getPersonalGoalById(id: number): Promise<PersonalGoal | null> {
+  const res = await query<GoalRow>(
+    `
+    SELECT ${GOAL_SELECT}
+    FROM personal_goals
+    WHERE id = $1
+    `,
+    [id]
+  );
+  const row = res.rows[0];
+  return row ? mapGoal(row) : null;
 }
 
 export async function createPersonalGoal(input: {

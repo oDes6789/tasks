@@ -60,6 +60,7 @@
 import { computed } from "vue";
 import Icon from "@/components/Icon.vue";
 import { ALL_SHORTCUTS, type ShortcutDef } from "@/lib/keyboardShortcuts";
+import { useAuthStore } from "@/stores/auth";
 
 defineProps<{
   open: boolean;
@@ -69,9 +70,12 @@ const emit = defineEmits<{
   close: [];
 }>();
 
+const auth = useAuthStore();
+
 const groups = computed(() => {
   const map = new Map<string, ShortcutDef[]>();
   for (const item of ALL_SHORTCUTS) {
+    if (item.id === "go-personnel" && !auth.isDepartmentHead) continue;
     const list = map.get(item.group) ?? [];
     list.push(item);
     map.set(item.group, list);

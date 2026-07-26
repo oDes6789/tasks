@@ -22,7 +22,11 @@
           />
         </div>
         <p class="mt-1 text-sm text-on-surface-variant">
-          Leader điều phối mục tiêu tuần tới từng nhân sự
+          {{
+            canManageAll
+              ? "Trưởng phòng điều phối mục tiêu tuần tới từng nhân sự"
+              : "Mục tiêu cá nhân của bạn trong tuần"
+          }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -32,7 +36,7 @@
           @click="focusDraft"
         >
           <Icon name="add" icon-class="text-[18px]" />
-          Thêm nhân sự
+          {{ canManageAll ? "Thêm nhân sự" : "Thêm mục tiêu" }}
         </button>
         <span
           class="inline-flex flex-wrap items-center gap-2 rounded-full bg-white px-3 py-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_1px_3px_rgb(0_0_0/0.06)]"
@@ -54,6 +58,7 @@
     </div>
 
     <div
+      v-if="canManageAll"
       class="mb-4 flex flex-col gap-3 rounded-md bg-white px-5 py-4 ambient-shadow sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -83,6 +88,23 @@
           {{ visibleRows.length - (showDraftInList ? 1 : 0) }} kết quả
         </p>
       </div>
+      <p
+        class="deadline-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium not-italic"
+        :class="`deadline-${deadlineUrgency}`"
+        :title="deadlineHint"
+      >
+        <Icon
+          :name="deadlineUrgency === 'ok' ? 'schedule' : 'warning'"
+          icon-class="text-[18px]"
+        />
+        <span>{{ meta.deadlineNote }}</span>
+      </p>
+    </div>
+
+    <div
+      v-else
+      class="mb-4 flex flex-wrap items-center justify-end rounded-md bg-white px-5 py-3 ambient-shadow"
+    >
       <p
         class="deadline-badge inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium not-italic"
         :class="`deadline-${deadlineUrgency}`"
@@ -132,7 +154,8 @@
         v-else-if="rows.length === 0 && !searchQuery.trim()"
         class="min-w-[960px] border-b border-dashed border-outline-variant/40 px-5 py-8 text-center text-sm text-on-surface-variant"
       >
-        Chưa có mục tiêu cá nhân cho tuần này. Bấm “Thêm nhân sự” để bắt đầu điều phối.
+        Chưa có mục tiêu cá nhân cho tuần này.
+        {{ canManageAll ? 'Bấm “Thêm nhân sự” để bắt đầu điều phối.' : 'Bấm “Thêm mục tiêu” để bắt đầu.' }}
       </p>
 
       <article
@@ -158,14 +181,18 @@
         <div
           data-field="person"
           class="goal-cell group relative pr-7"
-          :class="!row.isDraft && !isFieldEditing(row, 'person') ? 'cursor-pointer' : ''"
-          @dblclick="startFieldEdit(row, 'person')"
+          :class="
+            canEditPersonField(row) && !row.isDraft && !isFieldEditing(row, 'person')
+              ? 'cursor-pointer'
+              : ''
+          "
+          @dblclick="canEditPersonField(row) ? startFieldEdit(row, 'person') : undefined"
         >
           <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-primary/50 lg:hidden">
             Nhân sự
           </p>
           <Select
-            v-if="isFieldEditing(row, 'person')"
+            v-if="canEditPersonField(row) && isFieldEditing(row, 'person')"
             :modelValue="row.personName || null"
             :options="personOptionsFor(row)"
             optionLabel="name"
@@ -209,7 +236,7 @@
               </RouterLink>
             </div>
             <button
-              v-if="!row.isDraft"
+              v-if="canEditPersonField(row) && !row.isDraft"
               type="button"
               class="field-edit-btn"
               title="Sửa"
@@ -591,6 +618,7 @@
             <Icon name="check" icon-class="text-[18px]" />
           </button>
           <button
+            v-if="canDeleteRow(row)"
             type="button"
             class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-container-low text-error transition-colors hover:bg-error-container/50 disabled:opacity-50"
             :disabled="savingIds.has(row.id) || deletingIds.has(row.id)"
@@ -600,6 +628,14 @@
           >
             <Icon name="delete" icon-class="text-[18px]" />
           </button>
+          <span
+            v-else
+            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-outline"
+            title="Không thể xóa mục tiêu do Trưởng phòng tạo"
+            aria-label="Không thể xóa mục tiêu do Trưởng phòng tạo"
+          >
+            <Icon name="lock" icon-class="text-[16px]" />
+          </span>
         </div>
       </article>
     </div>
@@ -754,6 +790,7 @@ import {
   parseIsoDate,
   type DeadlineUrgency
 } from "@/lib/week";
+import { useAuthStore } from "@/stores/auth";
 
 interface PersonnelOption {
   name: string;
@@ -772,6 +809,7 @@ interface GoalRow {
   progress: string;
   nextFocus: string;
   createdBy?: string;
+  createdByDepartmentHead?: boolean;
   isDraft?: boolean;
 }
 
@@ -792,6 +830,9 @@ interface BoardMeta {
 
 const toast = useToast();
 const confirm = useConfirm();
+const auth = useAuthStore();
+const canManageAll = computed(() => auth.isDepartmentHead);
+const myPersonName = computed(() => auth.user?.name?.trim() || "");
 const initialWeek = getWeekInfo();
 
 const meta = ref<BoardMeta>({
@@ -1100,7 +1141,7 @@ async function applyExpandEditor() {
 const defaultPersonnel: PersonnelOption[] = [];
 
 function createEmptyDraft(): GoalRow {
-  return {
+  const draftRow: GoalRow = {
     id: -1,
     personName: "",
     personAvatar: null,
@@ -1111,6 +1152,11 @@ function createEmptyDraft(): GoalRow {
     createdBy: "",
     isDraft: true
   };
+  if (!canManageAll.value && myPersonName.value) {
+    draftRow.personName = myPersonName.value;
+    draftRow.personAvatar = auth.user?.avatarUrl ?? null;
+  }
+  return draftRow;
 }
 
 const draft = ref<GoalRow>(createEmptyDraft());
@@ -1151,6 +1197,7 @@ function hydrateRow(row: GoalRow): GoalRow {
     progress: row.progress ?? "",
     nextFocus: row.nextFocus ?? "",
     createdBy: row.createdBy ?? "",
+    createdByDepartmentHead: Boolean(row.createdByDepartmentHead),
     isDraft: false
   };
   markClean(hydrated);
@@ -1158,12 +1205,19 @@ function hydrateRow(row: GoalRow): GoalRow {
 }
 
 function isBlankDraft(row: Pick<GoalRow, "personName" | "goals" | "progress" | "nextFocus">) {
-  return (
-    !row.personName?.trim() &&
-    !row.goals?.trim() &&
-    !row.progress?.trim() &&
-    !row.nextFocus?.trim()
-  );
+  const contentEmpty =
+    !row.goals?.trim() && !row.progress?.trim() && !row.nextFocus?.trim();
+  if (!canManageAll.value) return contentEmpty;
+  return !row.personName?.trim() && contentEmpty;
+}
+
+function canEditPersonField(_row: GoalRow) {
+  return canManageAll.value;
+}
+
+function canDeleteRow(row: GoalRow) {
+  if (row.isDraft) return true;
+  return !row.createdByDepartmentHead;
 }
 
 function resetDraft() {
@@ -1220,6 +1274,7 @@ function isRowEditing(row: GoalRow) {
 }
 
 function setPerson(row: GoalRow, name: string | null | undefined) {
+  if (!canManageAll.value) return;
   const personName = name ?? "";
   const person = personnel.value.find((p) => p.name === personName);
   row.personName = personName;
@@ -1311,6 +1366,7 @@ function restoreFromBaseline(row: GoalRow) {
 
 async function startFieldEdit(row: GoalRow, field: EditField) {
   if (row.isDraft) return;
+  if (field === "person" && !canEditPersonField(row)) return;
   if (isFieldEditing(row, field)) return;
 
   if (editingCell.value) {
@@ -1339,8 +1395,13 @@ async function maybeSaveDraft(row: GoalRow) {
   // Ignore stale draft object after a successful save replaced `draft`.
   if (row !== draft.value) return;
   if (isBlankDraft(row)) return;
-  // Need at least a person or a goal so we don't create empty noise rows.
-  if (!row.personName?.trim() && !row.goals?.trim()) return;
+  if (!canManageAll.value) {
+    // Staff: person is auto-filled — require actual goal content.
+    if (!row.goals?.trim() && !row.progress?.trim() && !row.nextFocus?.trim()) return;
+  } else if (!row.personName?.trim() && !row.goals?.trim()) {
+    // Need at least a person or a goal so we don't create empty noise rows.
+    return;
+  }
   await saveRow(row);
 }
 
@@ -1489,11 +1550,15 @@ async function persistRow(row: GoalRow, options?: { quiet?: boolean }): Promise<
 }
 
 function focusDraft() {
+  if (!canManageAll.value && myPersonName.value && !draft.value.personName) {
+    draft.value.personName = myPersonName.value;
+    draft.value.personAvatar = auth.user?.avatarUrl ?? null;
+  }
   requestAnimationFrame(() => {
     const el = document.querySelector<HTMLElement>(`article[data-draft="1"]`);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    focusEditRowField(el, "person");
+    focusEditRowField(el, canManageAll.value ? "person" : "goals");
   });
 }
 
@@ -1511,7 +1576,9 @@ async function saveRow(row: GoalRow) {
     toast.add({
       severity: "warn",
       summary: "Thiếu nội dung",
-      detail: "Chọn nhân sự hoặc nhập mục tiêu trước khi lưu.",
+      detail: canManageAll.value
+        ? "Chọn nhân sự hoặc nhập mục tiêu trước khi lưu."
+        : "Nhập mục tiêu trước khi lưu.",
       life: 2500
     });
     return;
@@ -1580,6 +1647,15 @@ function clearDraft() {
 
 async function deleteRow(row: GoalRow) {
   if (deletingIds.value.has(row.id)) return;
+  if (!canDeleteRow(row)) {
+    toast.add({
+      severity: "warn",
+      summary: "Không thể xóa",
+      detail: "Mục tiêu do Trưởng phòng tạo không thể xóa.",
+      life: 3000
+    });
+    return;
+  }
 
   if (row.isDraft) {
     if (isBlankDraft(row)) {

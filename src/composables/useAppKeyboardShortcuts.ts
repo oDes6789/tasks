@@ -5,6 +5,7 @@ import {
   isTypingTarget,
   type ShortcutAction
 } from "@/lib/keyboardShortcuts";
+import { useAuthStore } from "@/stores/auth";
 
 function normalizeKey(key: string) {
   return key.length === 1 ? key.toLowerCase() : key.toLowerCase();
@@ -12,10 +13,12 @@ function normalizeKey(key: string) {
 
 export function useAppKeyboardShortcuts(helpOpen: Ref<boolean>) {
   const router = useRouter();
+  const auth = useAuthStore();
 
   function runAction(action: ShortcutAction) {
     switch (action.type) {
       case "navigate":
+        if (action.to === "/nhan-su" && !auth.isDepartmentHead) return;
         void router.push(action.to);
         break;
       case "focus-search": {
@@ -53,6 +56,7 @@ export function useAppKeyboardShortcuts(helpOpen: Ref<boolean>) {
       (s) => s.keys.length === 1 && normalizeKey(s.keys[0]) === key
     );
     if (!match) return;
+    if (match.id === "go-personnel" && !auth.isDepartmentHead) return;
 
     // Khi bảng trợ giúp đang mở, chỉ cho phép ? để đóng
     if (helpOpen.value && match.action.type !== "toggle-help") return;

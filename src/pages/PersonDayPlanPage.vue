@@ -11,6 +11,7 @@
 
       <div class="flex flex-wrap items-center gap-2">
         <Select
+          v-if="canSelectPerson"
           :modelValue="personName || null"
           :options="personnel"
           optionLabel="name"
@@ -60,7 +61,11 @@
       v-if="!personName"
       class="border border-outline-variant/40 bg-white px-5 py-14 text-center text-sm text-on-surface-variant"
     >
-      Chọn nhân sự để lập kế hoạch tuần theo ngày và giờ.
+      {{
+        canSelectPerson
+          ? "Chọn nhân sự để lập kế hoạch tuần theo ngày và giờ."
+          : "Đang tải kế hoạch của bạn…"
+      }}
     </p>
 
     <div v-else class="gantt-shell border border-outline-variant/40 bg-white">
@@ -285,6 +290,7 @@ import {
   parseIsoDate,
   toIsoDate
 } from "@/lib/week";
+import { useAuthStore } from "@/stores/auth";
 
 type SourceType = "custom" | "personal_goal" | "weekly_task";
 type DragMode = "move" | "resize-start" | "resize-end" | "create";
@@ -365,10 +371,17 @@ const SNAP_QUARTERS = 4; // 15 minutes
 const toast = useToast();
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
+const canSelectPerson = computed(() => auth.canSelectOtherPersonnel);
+const myPersonName = computed(() => auth.user?.name?.trim() || "");
 const initialWeek = getWeekInfo();
 const todayIso = toIsoDate(new Date());
 
-const personName = ref(String(route.params.personName ?? "").trim());
+const personName = ref(
+  canSelectPerson.value
+    ? String(route.params.personName ?? "").trim()
+    : myPersonName.value || String(route.params.personName ?? "").trim()
+);
 const selectedWeekStart = ref(
   typeof route.query.week === "string" && route.query.week
     ? getWeekInfo(parseIsoDate(route.query.week) ?? new Date()).weekStart
@@ -597,7 +610,23 @@ function syncRoute() {
   }
 }
 
+/** Non-managers always stay on their own plan. */
+function lockToOwnPlan(): boolean {
+  if (canSelectPerson.value) return false;
+  const mine = myPersonName.value;
+  if (!mine) return false;
+  if (personName.value === mine) return false;
+  personName.value = mine;
+  syncRoute();
+  return true;
+}
+
 function onPersonChange(name: string | null) {
+  if (!canSelectPerson.value) {
+    lockToOwnPlan();
+    void loadBoard();
+    return;
+  }
   personName.value = name?.trim() || "";
   syncRoute();
   void loadBoard();
@@ -1070,12 +1099,32 @@ async function toggleReminder(item: DayPlanItem) {
 watch(
   () => route.params.personName,
   (value) => {
+    if (!canSelectPerson.value) {
+      if (lockToOwnPlan()) {
+        void loadBoard();
+      }
+      return;
+    }
     const next = String(value ?? "").trim();
     if (next !== personName.value) {
       personName.value = next;
       void loadBoard();
     }
   }
+);
+
+watch(
+  [canSelectPerson, myPersonName],
+  () => {
+    if (lockToOwnPlan()) {
+      void loadBoard();
+    } else if (!canSelectPerson.value && !personName.value && myPersonName.value) {
+      personName.value = myPersonName.value;
+      syncRoute();
+      void loadBoard();
+    }
+  },
+  { immediate: true }
 );
 
 onMounted(async () => {
@@ -1093,7 +1142,10 @@ onMounted(async () => {
   window.addEventListener("pointerup", onPointerUp);
   reminderTimer = setInterval(() => checkReminders(), 30_000);
   checkReminders();
-  await ensurePersonnelList();
+  lockToOwnPlan();
+  if (canSelectPerson.value) {
+    await ensurePersonnelList();
+  }
   await loadBoard();
 });
 

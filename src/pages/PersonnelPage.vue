@@ -46,10 +46,10 @@
     </div>
 
     <div
-      v-if="!auth.isTeamLead"
+      v-if="!auth.isDepartmentHead"
       class="mb-4 rounded-md border border-outline-variant/40 bg-surface-container-low/60 px-4 py-3 text-sm text-on-surface-variant"
     >
-      Chỉ tài khoản <strong class="text-on-surface">teamlead</strong> mới được gán brand, bật theo dõi nghỉ Thứ 7 và xóa tài khoản.
+      Chỉ <strong class="text-on-surface">Trưởng phòng</strong> mới được gán brand, bật theo dõi nghỉ Thứ 7 và xóa tài khoản.
     </div>
 
     <div class="overflow-hidden rounded-md border border-outline-variant/40 bg-white ambient-shadow">
@@ -91,7 +91,7 @@
               <th class="users-th">Quản lý</th>
               <th class="users-th">Brand</th>
               <th class="users-th">Theo dõi T7</th>
-              <th v-if="auth.isTeamLead" class="users-th users-th-actions" />
+              <th v-if="auth.isDepartmentHead" class="users-th users-th-actions" />
             </tr>
           </thead>
           <tbody>
@@ -153,7 +153,7 @@
                   class="brand-seg"
                   role="group"
                   :aria-label="`Brand ${item.name}`"
-                  :class="{ 'is-readonly': !auth.isTeamLead, 'is-busy': savingIds.has(item.id) }"
+                  :class="{ 'is-readonly': !auth.isDepartmentHead, 'is-busy': savingIds.has(item.id) }"
                 >
                   <button
                     v-for="opt in brandSegOptions"
@@ -162,7 +162,7 @@
                     class="brand-seg-btn"
                     :data-brand="opt.value"
                     :class="{ 'is-active': item.leaveBrand === opt.value }"
-                    :disabled="!auth.isTeamLead || savingIds.has(item.id)"
+                    :disabled="!auth.isDepartmentHead || savingIds.has(item.id)"
                     :title="opt.label"
                     @click="onBrandSegClick(item, opt.value)"
                   >
@@ -181,7 +181,7 @@
                 <div class="flex items-center gap-2">
                   <ToggleSwitch
                     :modelValue="item.saturdayLeaveTracked"
-                    :disabled="!auth.isTeamLead || savingIds.has(item.id)"
+                    :disabled="!auth.isDepartmentHead || savingIds.has(item.id)"
                     @update:modelValue="(v: boolean) => onTrackChange(item, v)"
                   />
                   <span
@@ -192,7 +192,7 @@
                   </span>
                 </div>
               </td>
-              <td v-if="auth.isTeamLead" class="users-td users-td-actions">
+              <td v-if="auth.isDepartmentHead" class="users-td users-td-actions">
                 <button
                   v-if="!isMe(item.id)"
                   type="button"
@@ -361,13 +361,13 @@ async function patchUser(
 }
 
 function onBrandSegClick(item: AppUserRow, value: LeaveBrand) {
-  if (!auth.isTeamLead) return;
+  if (!auth.isDepartmentHead) return;
   const next = item.leaveBrand === value ? null : value;
   void patchUser(item, { leaveBrand: next });
 }
 
 function onTrackChange(item: AppUserRow, tracked: boolean) {
-  if (!auth.isTeamLead) return;
+  if (!auth.isDepartmentHead) return;
   if (item.saturdayLeaveTracked === tracked) return;
   void patchUser(item, { saturdayLeaveTracked: tracked });
 }

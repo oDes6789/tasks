@@ -4,7 +4,7 @@
       <div class="min-w-0">
         <h2 class="mb-1 text-headline-lg text-primary">ĐĂNG KÝ NGHỈ THỨ 7</h2>
         <p class="text-body-md text-on-surface-variant">
-          Danh sách theo nhân sự đã đăng nhập và trưởng nhóm · Mỗi người nghỉ không quá 50% số T7 trong tháng
+          Danh sách theo nhân sự đã đăng nhập và trưởng nhóm · Chỉ chính mình hoặc Trưởng phòng được sửa · Mỗi người nghỉ không quá 50% số T7 trong tháng
         </p>
       </div>
 
@@ -251,6 +251,7 @@
                     role="group"
                     :aria-label="`${person.name} ${formatShortDate(day)}`"
                     :title="leaveCellTitle(person.name, day)"
+                    :class="{ 'is-readonly': !canEditPerson(person.name) }"
                   >
                     <button
                       v-for="opt in selectOptions"
@@ -262,8 +263,12 @@
                         'is-active': getStatus(person.name, day) === opt.value,
                         'is-busy': isSaving(person.name, day)
                       }"
-                      :disabled="isSaving(person.name, day)"
-                      :title="leaveCellTitle(person.name, day) || opt.label"
+                      :disabled="!canEditPerson(person.name) || isSaving(person.name, day)"
+                      :title="
+                        canEditPerson(person.name)
+                          ? leaveCellTitle(person.name, day) || opt.label
+                          : 'Chỉ chính bạn hoặc Trưởng phòng được sửa'
+                      "
                       @click="onStatusChange(person.name, day, opt.value)"
                     >
                       {{ statusAbbrev(opt.value) }}
@@ -443,6 +448,10 @@ function isCurrentUser(name: string) {
   return name.toLowerCase().includes(me) || me.includes(name.toLowerCase().replace(/^m[rs]\.\s*/i, ""));
 }
 
+function canEditPerson(name: string) {
+  return auth.isDepartmentHead || isCurrentUser(name);
+}
+
 function initials(name: string) {
   const cleaned = name.replace(/^m[rs]\.\s*/i, "").trim();
   const parts = cleaned.split(/\s+/);
@@ -541,6 +550,7 @@ async function loadBoard() {
 }
 
 async function onStatusChange(personName: string, workDate: string, status: unknown) {
+  if (!canEditPerson(personName)) return;
   if (!status || typeof status !== "string") return;
   if (!LEAVE_STATUS_OPTIONS.some((o) => o.value === status)) return;
   const nextStatus = status as LeaveStatus;
@@ -1024,9 +1034,15 @@ onUnmounted(() => {
   background: #fff;
   color: #0b1c30;
 }
+.leave-seg.is-readonly {
+  opacity: 0.72;
+}
 .leave-seg-btn:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.65;
+}
+.leave-seg-btn.is-busy:disabled {
+  cursor: wait;
 }
 .leave-seg-btn.is-active[data-status="full"] { background: #d1fae5; color: #047857; }
 .leave-seg-btn.is-active[data-status="morning"] { background: #ffedd5; color: #c2410c; }

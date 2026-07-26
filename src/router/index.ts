@@ -60,7 +60,8 @@ const router = createRouter({
         {
           path: "nhan-su",
           name: "personnel",
-          component: () => import("@/pages/PersonnelPage.vue")
+          component: () => import("@/pages/PersonnelPage.vue"),
+          meta: { requiresDepartmentHead: true }
         }
       ]
     },
@@ -85,6 +86,10 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.guest && auth.user && to.name !== "login-callback") {
+    return { name: "dashboard" };
+  }
+
+  if (to.meta.requiresDepartmentHead && !auth.isDepartmentHead) {
     return { name: "dashboard" };
   }
 

@@ -7,7 +7,10 @@ import { createSessionToken, verifySessionToken } from "./sessionToken";
 import {
   deleteUserById,
   getUserById,
-  isAppUserTeamLead,
+  isAppUserDepartmentHead,
+  canEditSaturdayLeaveFor,
+  canManagePersonRecord,
+  isCreatedByDepartmentHead,
   listPublicUsers,
   loadUsersFromDb,
   toPublicUser,
@@ -22,6 +25,7 @@ import {
   createPersonalGoal,
   deletePersonalGoal,
   getPersonalGoalsBoard,
+  getPersonalGoalById,
   updatePersonalGoal
 } from "./personalGoalsRepo";
 import {
@@ -42,6 +46,14 @@ import {
   listSaturdayLeave,
   upsertSaturdayLeave
 } from "./saturdayLeaveRepo";
+import { getDashboardSummary } from "./dashboardRepo";
+import {
+  countUnreadNotices,
+  listNoticesForUser,
+  markAllNoticesRead,
+  markNoticeRead,
+  notifyPeopleByName
+} from "./noticesRepo";
 import { resolveWeekStart } from "../src/lib/week";
 import { DEFAULT_MEETING_OWNER } from "../src/lib/meetings";
 import { isLeaveBrand, type LeaveBrand } from "../src/lib/saturdayLeave";
@@ -254,97 +266,99 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-app.get("/api/dashboard/summary", (req, res) => {
+app.get("/api/dashboard/summary", async (req, res) => {
   const user = getSessionUser(req);
   if (!user) {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
 
-  res.json({
-    greetingName: user.name.split(" ").pop() || user.name,
-    stats: {
-      totalTasks: 42,
-      completed: 28,
-      inProgress: 10,
-      overdue: 4
-    },
-    activities: [
-      {
-        id: 1,
-        name: "Sarah Chen",
-        action: "đã cập nhật",
-        target: "Design System OKR",
-        targetTone: "primary",
-        time: "2 giờ trước",
-        team: "Product Design Team",
-        icon: "edit",
-        iconBg: "primary",
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuCo9hCw9neJWcpfjSu_JKgEvXK7nuw9SL_s-Rr0eo1TIjdRYt6XEjf0ykaI-MiesLZVVewQVm9hIfI8XBGibRxvlKGuccOW-iLkpw4rmXBExsv1PpwkucpRAUAejj55ddow-U9Kat6itZi9koij7zMeRlYCdz1GHVqapjOn0nWrzsfq7gUOIE8KfxhLy4WaE3hCopghZ9Hi9HXtZIsrfKipu6SdfMoMPNXTUOZhbz1NASorwJBlFYjwKfGvDnV5A-ceyzFOMngy4dY"
-      },
-      {
-        id: 2,
-        name: "Marcus Thorne",
-        action: "đã hoàn thành task",
-        target: "API Documentation",
-        targetTone: "secondary",
-        time: "4 giờ trước",
-        team: "Backend Infrastructure",
-        icon: "check",
-        iconBg: "secondary",
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuA6JQvFMA8FHXeAZvG0z11m6kprFlMN4QswQRPSVreMd2wXQOhrUM5PWCjBLK4rqzLfBoXNqGLBz8_5hnO5YXkkVrCHa1RGiANY1iIZJRHCpRFaidKD1LsoHMxMq9PsYioPoZij-sqBO3UqNoR3A7zhGIBVCyqn2JBWn-Nsy5cUy4tuStgmx0egCgFqHW0NWrs12FDeGQaJun8KPCAx_DTRpieqsSzAJEy-ICR43QbflbnheZW2wi6haV1rnicyUWIFklhDWRgyBKI"
-      },
-      {
-        id: 3,
-        name: "Elena Rodriguez",
-        action: "đã thêm 3 task mới vào",
-        target: "Q4 Launch Planning",
-        targetTone: "primary",
-        time: "Hôm qua lúc 17:30",
-        team: "Marketing",
-        icon: "add",
-        iconBg: "primary-container",
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuBNgchBwr9N6odH3kFSNc_qWK3YQUvvk3cq-m62wSSU3UMT2DZ5KmfBfmNv3DbjAmSZ2gYqh7G06ydumBRw_IAz1jkuwKRNfE9nMuNch7442B07XttklrBTZPmFanRIvRwoWsfJcHBx4WAaY1cXd1apgulsmkGktjCPlOvarFrXttoWz26nBjATFYu4pQgEge_lDu2NomhOmjSlXU85jjan-g8a_OR35wV4ZzOnMzPfg9itwt-9kvLuElsVR8DqWQuD-_OJ6aQ5wJU"
-      }
-    ],
-    team: [
-      {
-        id: 1,
-        name: "David Kim",
-        role: "Lead Developer",
-        status: "online",
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuCnP6fcpUGNHTik2VxWfc_wqip-_kadH7OKvYjBKXT7uxNHg0k6B_6YTtI_x2-fPv32lVslQqv10s_02TUxhlBrm0XyqHqsi9O-wc0M2xAunZdsRZpoHwtmTA0xtdxYILLMr37nhaEZ2m9o4-hRiyj64k3RPS-XO46Y_RKk3qaW-uAnVZpGFtnRMLRf5BzJc7z1F2iiLbwEk30Ta6_9G-epnG0FN6DCyX3uBiuprNxzAFEgi66j2O-65muv0Wp-DOPRZMi0JDlHI6c"
-      },
-      {
-        id: 2,
-        name: "Avery Smith",
-        role: "UI Designer",
-        status: "online",
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuAk8bzc9OoXaGWTJe2GH1DpEx0rHLuTY4aMgzR66mUIT0d5_BGTnOmvj2_21JC9SdbghCfE2qTvd4ks-rMPxdlGiMXdzwqJmexh5Tr5N-EfEeI22h5CDhcvqdKr3klZHrpidDB3XLUX_ZSti_Au_41I6cE3nzAUevWErRLyarUCMZtPxj2PzeoiNiv4uzJwq-rpcZ4CljnL0SYF3wNULQma9sqDcD_XeR-Hmjtau_6u7wU8O-snal_fXdwob-RrobUUhptAQVCbRh8"
-      },
-      {
-        id: 3,
-        name: "Julian Rossi",
-        role: "Product Manager",
-        status: "busy",
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuAN8BW_lUd-r7YZfDuDmn72Tc3fwyPDMs-o5Dy4BJa7rC1q3DEXKdXXyqhfbeXSg9JQbn_S79FZvIJzFSF-ANXn4yDvl6vycAJPpNLNr_t7qV171fBVDG4y1RdLtI54zzF3HNDvzSzWCD_dELalabAkJlFWEfsD9fKXA33SBQygZTPyHreOo5o3OCTNzoLkX5zlTh92CIjci8o4avOEMHNdFw5AbNSYfvcG7g3-j3tAgi5tX2XGzilvvgDhbNcyprRYS9qKFhGuGlM"
-      },
-      {
-        id: 4,
-        name: "Lily Zhao",
-        role: "Junior Dev",
-        status: "offline",
-        avatar:
-          "https://lh3.googleusercontent.com/aida-public/AB6AXuA0rbbBJQKK9LgLwhpNhCb0_XjaoQCMNUtcpqjzuZdxL8yB8Oiro1LnNW9tmpUiQpEC-P5VYvS9nGLSbewOpcPl6yGdQ4Q2UyIUGSuw4GogoqdoDDldKofTjJ2aBzj47r8YlQq07-J2UQDF2p_I28-p7c-hDvtbRY2QxdILADMErXBFE_BEoklFjYgxjj7e4DF-TNLj2rUpyP18J9WPgrz2p99KaF3_3DNO9jgoIQw39sPvp_NeIvf5hosYEOWXGtA8Ry1tBRNpK6Q"
-      }
-    ],
-    teamCapacity: 82
-  });
+  try {
+    const greetingName = user.name.split(" ").pop() || user.name;
+    const summary = await getDashboardSummary(req.query.week, greetingName);
+    res.json(summary);
+  } catch (err) {
+    console.error("Dashboard summary failed:", err);
+    res.status(500).json({ error: "Không tải được tổng quan dashboard." });
+  }
+});
+
+app.get("/api/notices", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const limitRaw = Number(req.query.limit);
+  const limit = Number.isFinite(limitRaw) ? limitRaw : 30;
+  const unreadOnly =
+    req.query.unreadOnly === "1" ||
+    req.query.unreadOnly === "true" ||
+    req.query.unread === "1";
+
+  try {
+    const [items, unreadCount] = await Promise.all([
+      listNoticesForUser(user.id, { limit, unreadOnly }),
+      countUnreadNotices(user.id)
+    ]);
+    res.json({ items, unreadCount });
+  } catch (err) {
+    console.error("Failed to load notices:", err);
+    res.status(500).json({ error: "Không tải được thông báo." });
+  }
+});
+
+app.get("/api/notices/unread-count", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  try {
+    const unreadCount = await countUnreadNotices(user.id);
+    res.json({ unreadCount });
+  } catch (err) {
+    console.error("Failed to count unread notices:", err);
+    res.status(500).json({ error: "Không đếm được thông báo." });
+  }
+});
+
+app.post("/api/notices/:id/read", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: "id không hợp lệ." });
+  }
+
+  try {
+    const notice = await markNoticeRead(user.id, id);
+    if (!notice) {
+      return res.status(404).json({ error: "Không tìm thấy thông báo." });
+    }
+    const unreadCount = await countUnreadNotices(user.id);
+    res.json({ notice, unreadCount });
+  } catch (err) {
+    console.error("Failed to mark notice read:", err);
+    res.status(500).json({ error: "Không đánh dấu đã đọc." });
+  }
+});
+
+app.post("/api/notices/read-all", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
+  }
+
+  try {
+    const updated = await markAllNoticesRead(user.id);
+    res.json({ updated, unreadCount: 0 });
+  } catch (err) {
+    console.error("Failed to mark all notices read:", err);
+    res.status(500).json({ error: "Không đánh dấu tất cả đã đọc." });
+  }
 });
 
 app.get("/api/tasks", async (req, res) => {
@@ -376,6 +390,7 @@ app.post("/api/tasks", async (req, res) => {
   const week = resolveWeekStart(req.body?.weekStart ?? req.query.week);
 
   try {
+    const actorName = user.name || user.email || "";
     const task = await createWeeklyTask({
       weekStart: week.weekStart,
       categoryId,
@@ -387,8 +402,20 @@ app.post("/api/tasks", async (req, res) => {
       kpi: req.body?.kpi,
       progress: req.body?.progress,
       progressNote: req.body?.progressNote,
-      createdBy: user.name || user.email || ""
+      createdBy: actorName
     });
+    const title = task.item?.trim() || "Mục tiêu tuần mới";
+    await notifyPeopleByName({
+      names: task.pics.map((p) => p.name),
+      excludeUserId: user.id,
+      excludeName: actorName,
+      type: "task",
+      title: `${actorName || "Hệ thống"} đã giao mục tiêu tuần`,
+      body: title,
+      link: "/tasks",
+      actorName,
+      meta: { taskId: task.id }
+    }).catch((err) => console.error("Notice emit (create task) failed:", err));
     res.status(201).json({ task, weekStart: week.weekStart });
   } catch (err) {
     console.error("Failed to create weekly task:", err);
@@ -408,6 +435,7 @@ app.patch("/api/tasks/:id", async (req, res) => {
   }
 
   try {
+    const actorName = user.name || user.email || "";
     const task = await updateWeeklyTask(id, {
       item: String(req.body?.item ?? ""),
       objective: String(req.body?.objective ?? ""),
@@ -421,6 +449,18 @@ app.patch("/api/tasks/:id", async (req, res) => {
     if (!task) {
       return res.status(404).json({ error: "Không tìm thấy mục tiêu." });
     }
+    const title = task.item?.trim() || "Mục tiêu tuần";
+    await notifyPeopleByName({
+      names: task.pics.map((p) => p.name),
+      excludeUserId: user.id,
+      excludeName: actorName,
+      type: "task",
+      title: `${actorName || "Hệ thống"} đã cập nhật mục tiêu tuần`,
+      body: title,
+      link: "/tasks",
+      actorName,
+      meta: { taskId: task.id }
+    }).catch((err) => console.error("Notice emit (update task) failed:", err));
     res.json({ task });
   } catch (err) {
     console.error("Failed to update weekly task:", err);
@@ -459,6 +499,14 @@ app.get("/api/personal-goals", async (req, res) => {
 
   try {
     const board = await getPersonalGoalsBoard(req.query.week);
+    if (!isAppUserDepartmentHead(user)) {
+      const mine = user.name || "";
+      board.rows = board.rows.filter((row) => canManagePersonRecord(user, row.personName));
+      board.personnel = board.personnel.filter((p) => canManagePersonRecord(user, p.name));
+      if (mine && board.personnel.length === 0) {
+        board.personnel = [{ name: mine, avatar: user.avatarUrl ?? null }];
+      }
+    }
     res.json(board);
   } catch (err) {
     console.error("Failed to load personal goals:", err);
@@ -473,18 +521,41 @@ app.post("/api/personal-goals", async (req, res) => {
   }
 
   const week = resolveWeekStart(req.body?.weekStart ?? req.query.week);
+  let personName = String(req.body?.personName ?? "").trim();
+  let personAvatar =
+    req.body?.personAvatar == null ? null : String(req.body.personAvatar);
+
+  if (!isAppUserDepartmentHead(user)) {
+    personName = user.name || "";
+    personAvatar = user.avatarUrl ?? null;
+    if (!personName) {
+      return res.status(400).json({ error: "Không xác định được nhân sự đăng nhập." });
+    }
+  }
 
   try {
+    const actorName = user.name || user.email || "";
     const row = await createPersonalGoal({
       weekStart: week.weekStart,
-      personName: req.body?.personName,
-      personAvatar: req.body?.personAvatar ?? null,
+      personName,
+      personAvatar,
       goals: req.body?.goals,
       status: req.body?.status,
       progress: req.body?.progress,
       nextFocus: req.body?.nextFocus,
-      createdBy: user.name || user.email || ""
+      createdBy: actorName
     });
+    await notifyPeopleByName({
+      names: [personName],
+      excludeUserId: user.id,
+      excludeName: actorName,
+      type: "goal",
+      title: `${actorName || "Hệ thống"} đã tạo mục tiêu cá nhân`,
+      body: String(row.goals ?? "").trim().slice(0, 200) || "Mục tiêu cá nhân mới",
+      link: "/muc-tieu-ca-nhan",
+      actorName,
+      meta: { goalId: row.id }
+    }).catch((err) => console.error("Notice emit (create goal) failed:", err));
     res.status(201).json({ row, weekStart: week.weekStart });
   } catch (err) {
     console.error("Failed to create personal goal:", err);
@@ -504,9 +575,27 @@ app.patch("/api/personal-goals/:id", async (req, res) => {
   }
 
   try {
+    const existing = await getPersonalGoalById(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Không tìm thấy mục tiêu cá nhân." });
+    }
+    if (!canManagePersonRecord(user, existing.personName)) {
+      return res.status(403).json({ error: "Chỉ được sửa mục tiêu của chính mình." });
+    }
+
+    let personName = String(req.body?.personName ?? "");
+    let personAvatar =
+      req.body?.personAvatar == null ? null : String(req.body.personAvatar);
+
+    if (!isAppUserDepartmentHead(user)) {
+      personName = existing.personName;
+      personAvatar = existing.personAvatar;
+    }
+
+    const actorName = user.name || user.email || "";
     const row = await updatePersonalGoal(id, {
-      personName: String(req.body?.personName ?? ""),
-      personAvatar: req.body?.personAvatar == null ? null : String(req.body.personAvatar),
+      personName,
+      personAvatar,
       goals: String(req.body?.goals ?? ""),
       status: String(req.body?.status ?? "pending"),
       progress: String(req.body?.progress ?? ""),
@@ -515,6 +604,17 @@ app.patch("/api/personal-goals/:id", async (req, res) => {
     if (!row) {
       return res.status(404).json({ error: "Không tìm thấy mục tiêu cá nhân." });
     }
+    await notifyPeopleByName({
+      names: [row.personName],
+      excludeUserId: user.id,
+      excludeName: actorName,
+      type: "goal",
+      title: `${actorName || "Hệ thống"} đã cập nhật mục tiêu cá nhân`,
+      body: String(row.goals ?? "").trim().slice(0, 200) || "Mục tiêu cá nhân",
+      link: "/muc-tieu-ca-nhan",
+      actorName,
+      meta: { goalId: row.id }
+    }).catch((err) => console.error("Notice emit (update goal) failed:", err));
     res.json({ row });
   } catch (err) {
     console.error("Failed to update personal goal:", err);
@@ -534,6 +634,19 @@ app.delete("/api/personal-goals/:id", async (req, res) => {
   }
 
   try {
+    const existing = await getPersonalGoalById(id);
+    if (!existing) {
+      return res.status(404).json({ error: "Không tìm thấy mục tiêu cá nhân." });
+    }
+    if (!canManagePersonRecord(user, existing.personName)) {
+      return res.status(403).json({ error: "Chỉ được xóa mục tiêu của chính mình." });
+    }
+    if (isCreatedByDepartmentHead(existing.createdBy)) {
+      return res.status(403).json({
+        error: "Không thể xóa mục tiêu do Trưởng phòng tạo."
+      });
+    }
+
     const ok = await deletePersonalGoal(id);
     if (!ok) {
       return res.status(404).json({ error: "Không tìm thấy mục tiêu cá nhân." });
@@ -807,6 +920,9 @@ app.get("/api/users", async (req, res) => {
   if (!user) {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
+  if (!isAppUserDepartmentHead(user)) {
+    return res.status(403).json({ error: "Chỉ Trưởng phòng được xem quản lý nhân sự." });
+  }
 
   try {
     res.json({ items: listPublicUsers() });
@@ -821,8 +937,8 @@ app.patch("/api/users/:id", async (req, res) => {
   if (!user) {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
-  if (!isAppUserTeamLead(user)) {
-    return res.status(403).json({ error: "Chỉ tài khoản teamlead mới được chỉnh sửa." });
+  if (!isAppUserDepartmentHead(user)) {
+    return res.status(403).json({ error: "Chỉ Trưởng phòng được chỉnh sửa." });
   }
 
   const id = Number(req.params.id);
@@ -878,8 +994,8 @@ app.delete("/api/users/:id", async (req, res) => {
   if (!user) {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
-  if (!isAppUserTeamLead(user)) {
-    return res.status(403).json({ error: "Chỉ tài khoản teamlead mới được xóa." });
+  if (!isAppUserDepartmentHead(user)) {
+    return res.status(403).json({ error: "Chỉ Trưởng phòng được xóa." });
   }
 
   const id = Number(req.params.id);
@@ -923,13 +1039,32 @@ app.put("/api/saturday-leave", async (req, res) => {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
 
+  const personName = String(req.body?.personName ?? "").trim();
+  if (!canEditSaturdayLeaveFor(user, personName)) {
+    return res.status(403).json({
+      error: "Chỉ được sửa đăng ký của chính mình. Trưởng phòng được sửa tất cả."
+    });
+  }
+
   try {
+    const actorName = user.name || user.email || "unknown";
     const item = await upsertSaturdayLeave({
       workDate: req.body?.workDate,
-      personName: req.body?.personName,
+      personName,
       status: req.body?.status,
-      updatedBy: user.name || user.email || "unknown"
+      updatedBy: actorName
     });
+    await notifyPeopleByName({
+      names: [personName],
+      excludeUserId: user.id,
+      excludeName: actorName,
+      type: "leave",
+      title: `${actorName || "Hệ thống"} đã cập nhật nghỉ Thứ 7`,
+      body: `${personName} · ${item.workDate} · ${item.status}`,
+      link: "/nghi-thu-7",
+      actorName,
+      meta: { workDate: item.workDate, status: item.status }
+    }).catch((err) => console.error("Notice emit (saturday leave) failed:", err));
     res.json({ item });
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
@@ -956,10 +1091,17 @@ app.delete("/api/saturday-leave", async (req, res) => {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
 
+  const personName = String(req.body?.personName ?? req.query.personName ?? "").trim();
+  if (!canEditSaturdayLeaveFor(user, personName)) {
+    return res.status(403).json({
+      error: "Chỉ được sửa đăng ký của chính mình. Trưởng phòng được sửa tất cả."
+    });
+  }
+
   try {
     const ok = await clearSaturdayLeave({
       workDate: req.body?.workDate ?? req.query.workDate,
-      personName: req.body?.personName ?? req.query.personName
+      personName
     });
     res.json({ ok });
   } catch (err) {

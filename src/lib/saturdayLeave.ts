@@ -28,18 +28,44 @@ export function isTeamLeadLabel(raw: string | null | undefined): boolean {
   return /trưởng\s*nhóm|truong\s*nhom|team\s*lead|teamlead|leader|\btn\b/.test(hay);
 }
 
+/** True when account type / role text indicates department head (trưởng phòng). */
+export function isDepartmentHeadLabel(raw: string | null | undefined): boolean {
+  const hay = String(raw ?? "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  return /trưởng\s*phòng|truong\s*phong|dept\.?\s*head|department\s*head|head\s*of\s*dept/.test(
+    hay
+  );
+}
+
 export function isLeaveBrand(value: unknown): value is LeaveBrand {
   return value === "general" || value === "im" || value === "ec";
 }
 
-/** Team lead if account type name/slug matches teamlead / trưởng nhóm. */
-export function isTeamLeadAccount(position: {
+type AccountPosition = {
   accountType?: { name?: string | null; slug?: string | null } | null;
-} | null | undefined): boolean {
+} | null | undefined;
+
+/** Team lead if account type name/slug matches teamlead / trưởng nhóm. */
+export function isTeamLeadAccount(position: AccountPosition): boolean {
   if (!position?.accountType) return false;
   return (
     isTeamLeadLabel(position.accountType.name) || isTeamLeadLabel(position.accountType.slug)
   );
+}
+
+/** Department head if account type name/slug matches trưởng phòng. */
+export function isDepartmentHeadAccount(position: AccountPosition): boolean {
+  if (!position?.accountType) return false;
+  return (
+    isDepartmentHeadLabel(position.accountType.name) ||
+    isDepartmentHeadLabel(position.accountType.slug)
+  );
+}
+
+/** Can pick another person's day plan — chỉ trưởng phòng. */
+export function canSelectOtherPersonnel(position: AccountPosition): boolean {
+  return isDepartmentHeadAccount(position);
 }
 
 export const LEAVE_BRAND_OPTIONS: { value: LeaveBrand; label: string }[] = [

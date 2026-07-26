@@ -209,6 +209,26 @@ export async function migrate(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_app_users_edutalk
       ON app_users (edutalk_user_id);
+
+    CREATE TABLE IF NOT EXISTS notices (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL DEFAULT 'info',
+      title TEXT NOT NULL,
+      body TEXT NOT NULL DEFAULT '',
+      link TEXT,
+      actor_name TEXT NOT NULL DEFAULT '',
+      meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+      read_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notices_user_created
+      ON notices (user_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_notices_user_unread
+      ON notices (user_id, created_at DESC)
+      WHERE read_at IS NULL;
   `);
 
   for (const cat of CATEGORIES) {

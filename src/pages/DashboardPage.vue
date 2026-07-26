@@ -1,11 +1,31 @@
 <template>
   <div>
-    <section class="mb-stack-lg">
-      <h2 class="text-headline-lg text-on-surface">{{ greeting }}, {{ displayName }}</h2>
-      <p class="mt-1 text-body-lg text-on-surface-variant">
-        Here is what's happening with your projects today.
-      </p>
+    <section class="mb-stack-lg flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h2 class="text-headline-lg text-on-surface">{{ greeting }}, {{ displayName }}</h2>
+        <p class="mt-1 text-body-lg text-on-surface-variant">
+          Tổng quan tuần · {{ weekLabel || "…" }}
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <RouterLink
+          to="/tasks"
+          class="rounded-full bg-secondary-container px-4 py-2 text-label-md text-primary transition-colors hover:bg-primary-fixed"
+        >
+          Mục tiêu tuần
+        </RouterLink>
+        <RouterLink
+          to="/nghi-thu-7"
+          class="rounded-full bg-surface-container-high px-4 py-2 text-label-md text-on-surface transition-colors hover:bg-surface-container-highest"
+        >
+          Nghỉ Thứ 7
+        </RouterLink>
+      </div>
     </section>
+
+    <p v-if="loadError" class="mb-4 rounded-lg bg-error-container/40 px-4 py-3 text-sm text-error">
+      {{ loadError }}
+    </p>
 
     <section class="mb-stack-lg grid grid-cols-1 gap-gutter md:grid-cols-4">
       <article
@@ -28,45 +48,94 @@
       </article>
     </section>
 
+    <section class="mb-stack-lg grid grid-cols-1 gap-gutter md:grid-cols-3">
+      <article
+        class="rounded-lg border border-surface-container bg-surface-container-lowest p-stack-md"
+      >
+        <p class="text-label-md text-on-surface-variant">Mục tiêu cá nhân On Track</p>
+        <p class="mt-1 text-headline-md text-on-surface">
+          {{ goals.onTrack }}/{{ goals.total }}
+        </p>
+        <p class="mt-2 text-sm text-on-surface-variant">
+          Done {{ goals.done }} · Đang làm {{ goals.inProgress }} · Pending {{ goals.pending }}
+        </p>
+      </article>
+      <article
+        class="rounded-lg border border-surface-container bg-surface-container-lowest p-stack-md"
+      >
+        <p class="text-label-md text-on-surface-variant">Day plan coverage</p>
+        <p class="mt-1 text-headline-md text-on-surface">
+          {{ dayPlan.coveragePct == null ? "—" : `${dayPlan.coveragePct}%` }}
+        </p>
+        <p class="mt-2 text-sm text-on-surface-variant">
+          {{ dayPlan.peopleWithPlans }}/{{ dayPlan.peopleWithGoals }} người có kế hoạch ngày
+        </p>
+      </article>
+      <article
+        class="rounded-lg border border-surface-container bg-surface-container-lowest p-stack-md"
+      >
+        <p class="text-label-md text-on-surface-variant">Nghỉ T7 · {{ leave.month }}</p>
+        <p class="mt-1 text-headline-md text-on-surface">
+          {{ leave.overLimit }} vượt · {{ leave.nearCap }} gần 50%
+        </p>
+        <p class="mt-2 text-sm text-on-surface-variant">
+          Theo dõi {{ leave.trackedCount }} người
+          <template v-if="leave.byBrand.length">
+            ·
+            {{
+              leave.byBrand
+                .filter((b) => b.tracked > 0)
+                .map((b) => `${b.label} ${b.tracked}`)
+                .join(" · ")
+            }}
+          </template>
+        </p>
+      </article>
+    </section>
+
     <div class="grid grid-cols-1 gap-stack-lg lg:grid-cols-3">
       <section
         class="rounded-lg border border-surface-container/30 bg-white p-stack-md ambient-shadow-lg lg:col-span-2"
       >
         <div class="mb-6 flex items-center justify-between">
-          <h3 class="text-headline-md text-on-surface">Recent Activity</h3>
-          <button
-            type="button"
+          <h3 class="text-headline-md text-on-surface">Cập nhật gần đây</h3>
+          <RouterLink
+            to="/tasks"
             class="text-label-md text-primary underline-offset-4 hover:underline decoration-2"
           >
-            View All
-          </button>
+            Xem board
+          </RouterLink>
         </div>
 
-        <div class="space-y-6">
+        <div v-if="loading && !activities.length" class="text-sm text-on-surface-variant">
+          Đang tải…
+        </div>
+        <div v-else-if="!activities.length" class="text-sm text-on-surface-variant">
+          Chưa có cập nhật nào trong tuần này.
+        </div>
+        <div v-else class="space-y-2">
           <div
             v-for="item in activities"
             :key="item.id"
             class="flex gap-4 rounded-xl p-4 transition-colors hover:bg-surface-container-low"
           >
-            <div class="relative">
-              <img :src="item.avatar" :alt="item.name" class="h-12 w-12 rounded-full object-cover" />
-              <div
-                class="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white"
-                :class="iconBgClass(item.iconBg)"
-              >
-                <Icon :name="item.icon" icon-class="text-[12px] text-white" />
-              </div>
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              :class="
+                item.kind === 'goal' ? 'bg-secondary-container text-secondary' : 'bg-primary/10 text-primary'
+              "
+            >
+              <Icon :name="item.kind === 'goal' ? 'person' : 'assignment'" icon-class="text-[18px]" />
             </div>
-            <div class="flex-grow">
-              <p class="text-body-md text-on-surface">
-                <span class="font-bold">{{ item.name }}</span>
-                {{ " " }}{{ item.action }}{{ " " }}
-                <span class="font-medium" :class="targetClass(item.targetTone)">{{
-                  item.target
-                }}</span>
+            <div class="min-w-0 flex-grow">
+              <p class="truncate text-body-md text-on-surface">
+                <span class="font-bold">{{ item.actor || "Hệ thống" }}</span>
+                {{ " " }}đã cập nhật{{ " " }}
+                <span class="font-medium text-primary">{{ item.title }}</span>
               </p>
               <p class="mt-1 text-sm text-on-surface-variant">
-                {{ item.time }} • {{ item.team }}
+                {{ relativeTime(item.updatedAt) }} ·
+                {{ item.kind === "goal" ? "Mục tiêu cá nhân" : "Mục tiêu tuần" }}
               </p>
             </div>
           </div>
@@ -75,81 +144,71 @@
 
       <section class="rounded-lg border border-surface-container bg-surface-container-low p-stack-md">
         <div class="mb-6 flex items-center justify-between">
-          <h3 class="text-headline-md text-on-surface">Team</h3>
-          <button
-            type="button"
+          <h3 class="text-headline-md text-on-surface">PIC cần chú ý</h3>
+          <RouterLink
+            to="/muc-tieu-ca-nhan"
             class="rounded-full bg-white p-2 text-primary ambient-shadow transition-transform hover:scale-105"
+            title="Mục tiêu cá nhân"
           >
-            <Icon name="person_add" />
-          </button>
+            <Icon name="person" />
+          </RouterLink>
         </div>
 
-        <div class="space-y-4">
+        <div v-if="!topDelayedPics.length" class="text-sm text-on-surface-variant">
+          Không có PIC delayed / tồn đọng tuần này.
+        </div>
+        <div v-else class="space-y-3">
           <div
-            v-for="member in team"
-            :key="member.id"
-            class="flex items-center justify-between rounded-2xl border border-white bg-white/50 p-3 transition-all hover:bg-white"
+            v-for="pic in topDelayedPics"
+            :key="pic.name"
+            class="flex items-center justify-between rounded-2xl border border-white bg-white/50 p-3"
           >
-            <div class="flex items-center gap-3">
-              <img
-                :src="member.avatar"
-                :alt="member.name"
-                class="h-10 w-10 rounded-full object-cover"
-              />
-              <div>
-                <p class="text-label-md font-bold text-on-surface">{{ member.name }}</p>
-                <p class="text-[12px] text-on-surface-variant">{{ member.role }}</p>
-              </div>
-            </div>
-            <div class="h-2 w-2 rounded-full" :class="statusDot(member.status)" />
+            <p class="text-label-md font-bold text-on-surface">{{ pic.name }}</p>
+            <span class="rounded-full bg-error-container/40 px-2.5 py-1 text-xs font-semibold text-error">
+              {{ pic.count }} việc
+            </span>
           </div>
         </div>
 
         <div class="mt-8">
           <div class="rounded-2xl border border-primary/10 bg-primary/5 p-4">
-            <p class="mb-2 text-sm font-medium text-primary">Team Capacity</p>
+            <p class="mb-2 text-sm font-medium text-primary">Tiến độ tuần (% Done)</p>
             <div class="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
               <div
                 class="h-full rounded-full bg-primary transition-all"
-                :style="{ width: `${teamCapacity}%` }"
+                :style="{ width: `${stats.donePct}%` }"
               />
             </div>
             <p class="mt-2 text-right text-[12px] text-on-surface-variant">
-              {{ teamCapacity }}% Assigned
+              {{ stats.completed }}/{{ stats.totalTasks }} hoàn thành
             </p>
           </div>
         </div>
       </section>
     </div>
 
-    <section class="mt-stack-lg">
-      <div
-        class="relative flex flex-col items-center justify-between gap-6 overflow-hidden rounded-xl bg-primary-container p-stack-lg text-on-primary-container ambient-shadow-lg md:flex-row"
-      >
-        <div class="relative z-10 max-w-lg">
-          <span
-            class="mb-4 inline-block rounded-full bg-white/20 px-3 py-1 text-sm font-medium backdrop-blur-md"
-          >
-            Pro Tip
-          </span>
-          <h3 class="mb-2 text-headline-md">You're 20% more productive this week!</h3>
-          <p class="text-body-md opacity-90">
-            Completing tasks early in the morning seems to be your sweet spot. We've scheduled your
-            most complex deep-work tasks for 9 AM tomorrow.
-          </p>
-        </div>
-        <div class="relative z-10 flex gap-4">
-          <button
-            type="button"
-            class="rounded-full bg-white px-8 py-4 font-bold text-primary shadow-lg transition-all hover:scale-105 active:scale-95"
-          >
-            View Analysis
-          </button>
-        </div>
-        <div class="absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+    <section
+      v-if="categoriesWithWork.length"
+      class="mt-stack-lg rounded-lg border border-surface-container bg-white p-stack-md ambient-shadow"
+    >
+      <h3 class="mb-4 text-headline-md text-on-surface">Phân bố theo category</h3>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div
-          class="absolute -left-10 -top-10 h-48 w-48 rounded-full bg-secondary-container/20 blur-3xl"
-        />
+          v-for="cat in categoriesWithWork"
+          :key="cat.id"
+          class="rounded-xl bg-surface-container-low px-4 py-3"
+        >
+          <p class="truncate text-sm font-medium text-on-surface">{{ cat.title }}</p>
+          <p class="mt-1 text-label-md text-on-surface-variant">
+            {{ cat.done }}/{{ cat.total }} done
+          </p>
+          <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-container-high">
+            <div
+              class="h-full rounded-full bg-secondary"
+              :style="{ width: `${cat.total ? Math.round((cat.done / cat.total) * 100) : 0}%` }"
+            />
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -157,122 +216,257 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 import Icon from "@/components/Icon.vue";
 import { authHeaders } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth";
 
-interface Activity {
-  id: number;
-  name: string;
-  action: string;
-  target: string;
-  targetTone: string;
-  time: string;
-  team: string;
-  icon: string;
-  iconBg: string;
-  avatar: string;
+interface DashboardStats {
+  totalTasks: number;
+  completed: number;
+  inProgress: number;
+  pending: number;
+  donePct: number;
+  kpiAchieved: number;
+  kpiNotAchieved: number;
+  kpiDelayed: number;
+  kpiRated: number;
+  kpiAchievedPct: number | null;
+  backlogOpen: number;
+  delayedCount: number;
+  attentionCount: number;
+  totalTasksDelta: number | null;
+  donePctDelta: number | null;
 }
 
-interface TeamMember {
-  id: number;
-  name: string;
-  role: string;
-  status: string;
-  avatar: string;
+interface GoalsSummary {
+  total: number;
+  done: number;
+  inProgress: number;
+  pending: number;
+  onTrack: number;
 }
+
+interface DayPlanSummary {
+  peopleWithGoals: number;
+  peopleWithPlans: number;
+  coveragePct: number | null;
+}
+
+interface LeaveSummary {
+  month: string;
+  trackedCount: number;
+  nearCap: number;
+  overLimit: number;
+  byBrand: { brand: string; label: string; tracked: number }[];
+}
+
+interface Activity {
+  id: string;
+  kind: "task" | "goal";
+  title: string;
+  actor: string;
+  updatedAt: string;
+}
+
+interface PicStat {
+  name: string;
+  count: number;
+}
+
+interface CategoryStat {
+  id: number;
+  title: string;
+  total: number;
+  done: number;
+}
+
+const emptyStats = (): DashboardStats => ({
+  totalTasks: 0,
+  completed: 0,
+  inProgress: 0,
+  pending: 0,
+  donePct: 0,
+  kpiAchieved: 0,
+  kpiNotAchieved: 0,
+  kpiDelayed: 0,
+  kpiRated: 0,
+  kpiAchievedPct: null,
+  backlogOpen: 0,
+  delayedCount: 0,
+  attentionCount: 0,
+  totalTasksDelta: null,
+  donePctDelta: null
+});
 
 const auth = useAuthStore();
+const loading = ref(true);
+const loadError = ref("");
 const greetingName = ref("");
-const stats = ref({ totalTasks: 42, completed: 28, inProgress: 10, overdue: 4 });
+const weekLabel = ref("");
+const stats = ref<DashboardStats>(emptyStats());
+const goals = ref<GoalsSummary>({
+  total: 0,
+  done: 0,
+  inProgress: 0,
+  pending: 0,
+  onTrack: 0
+});
+const dayPlan = ref<DayPlanSummary>({
+  peopleWithGoals: 0,
+  peopleWithPlans: 0,
+  coveragePct: null
+});
+const leave = ref<LeaveSummary>({
+  month: "",
+  trackedCount: 0,
+  nearCap: 0,
+  overLimit: 0,
+  byBrand: []
+});
 const activities = ref<Activity[]>([]);
-const team = ref<TeamMember[]>([]);
-const teamCapacity = ref(82);
+const topDelayedPics = ref<PicStat[]>([]);
+const categories = ref<CategoryStat[]>([]);
 
 const hour = new Date().getHours();
 const greeting = computed(() => {
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return "Chào buổi sáng";
+  if (hour < 18) return "Chào buổi chiều";
+  return "Chào buổi tối";
 });
 
 const displayName = computed(
-  () => greetingName.value || auth.user?.name?.split(" ").pop() || "there"
+  () => greetingName.value || auth.user?.name?.split(" ").pop() || "bạn"
 );
 
-const summaryCards = computed(() => [
-  {
-    label: "Total Tasks",
-    value: stats.value.totalTasks,
-    icon: "list_alt",
-    iconWrap: "bg-primary-container/10",
-    iconClass: "text-primary",
-    meta: "12% from last week",
-    metaIcon: "trending_up",
-    metaClass: "text-primary"
-  },
-  {
-    label: "Completed",
-    value: stats.value.completed,
-    icon: "task_alt",
-    iconWrap: "bg-secondary-container",
-    iconClass: "text-secondary",
-    meta: "67% Success rate",
-    metaIcon: "check_circle",
-    metaClass: "text-secondary"
-  },
-  {
-    label: "In Progress",
-    value: stats.value.inProgress,
-    icon: "autorenew",
-    iconWrap: "bg-surface-variant",
-    iconClass: "text-primary",
-    meta: "On track",
-    metaIcon: "schedule",
-    metaClass: "text-on-surface-variant"
-  },
-  {
-    label: "Overdue",
-    value: stats.value.overdue,
-    icon: "warning",
-    iconWrap: "bg-error-container/40",
-    iconClass: "text-error",
-    meta: "Needs attention",
-    metaIcon: "priority_high",
-    metaClass: "text-error"
-  }
-]);
+const categoriesWithWork = computed(() => categories.value.filter((c) => c.total > 0));
 
-function iconBgClass(tone: string) {
-  if (tone === "secondary") return "bg-secondary";
-  if (tone === "primary-container") return "bg-primary-container";
-  return "bg-primary";
+function formatDelta(value: number | null, suffix = ""): string {
+  if (value == null) return "So với tuần trước: —";
+  if (value === 0) return `Ngang tuần trước${suffix}`;
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value}${suffix} so với tuần trước`;
 }
 
-function targetClass(tone: string) {
-  return tone === "secondary" ? "text-secondary" : "text-primary";
-}
+const summaryCards = computed(() => {
+  const s = stats.value;
+  const kpiLabel =
+    s.kpiAchievedPct == null
+      ? "Chưa chấm KPI"
+      : `${s.kpiAchieved}/${s.kpiRated} đã đạt`;
+  const attentionMeta =
+    s.attentionCount === 0
+      ? "Ổn"
+      : `${s.delayedCount} delayed · ${s.backlogOpen} tồn đọng`;
 
-function statusDot(status: string) {
-  if (status === "online") return "bg-green-400";
-  if (status === "busy") return "bg-orange-400";
-  return "bg-on-surface-variant/30";
+  return [
+    {
+      label: "Task tuần",
+      value: s.totalTasks,
+      icon: "list_alt",
+      iconWrap: "bg-primary-container/10",
+      iconClass: "text-primary",
+      meta: formatDelta(s.totalTasksDelta),
+      metaIcon: (s.totalTasksDelta ?? 0) >= 0 ? "trending_up" : "trending_down",
+      metaClass: "text-primary"
+    },
+    {
+      label: "% hoàn thành",
+      value: `${s.donePct}%`,
+      icon: "task_alt",
+      iconWrap: "bg-secondary-container",
+      iconClass: "text-secondary",
+      meta: formatDelta(s.donePctDelta, " điểm"),
+      metaIcon: "check_circle",
+      metaClass: s.donePct >= 70 ? "text-secondary" : "text-on-surface-variant"
+    },
+    {
+      label: "KPI đạt",
+      value: s.kpiAchievedPct == null ? "—" : `${s.kpiAchievedPct}%`,
+      icon: "verified",
+      iconWrap: "bg-surface-variant",
+      iconClass: "text-primary",
+      meta: kpiLabel,
+      metaIcon: "schedule",
+      metaClass:
+        s.kpiAchievedPct == null
+          ? "text-on-surface-variant"
+          : s.kpiAchievedPct >= 70
+            ? "text-secondary"
+            : "text-error"
+    },
+    {
+      label: "Delayed / tồn đọng",
+      value: s.attentionCount,
+      icon: "warning",
+      iconWrap: "bg-error-container/40",
+      iconClass: "text-error",
+      meta: attentionMeta,
+      metaIcon: "priority_high",
+      metaClass: s.attentionCount > 0 ? "text-error" : "text-secondary"
+    }
+  ];
+});
+
+function relativeTime(iso: string): string {
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return iso;
+  const diffSec = Math.round((Date.now() - ts) / 1000);
+  if (diffSec < 60) return "Vừa xong";
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`;
+  if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)} ngày trước`;
+  return new Date(ts).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 }
 
 onMounted(async () => {
+  loading.value = true;
+  loadError.value = "";
   try {
     const res = await fetch("/api/dashboard/summary", { headers: { ...authHeaders() } });
-    if (!res.ok) return;
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      loadError.value = body?.error || "Không tải được dashboard.";
+      return;
+    }
     const data = await res.json();
-    greetingName.value = data.greetingName;
-    stats.value = data.stats;
-    activities.value = data.activities;
-    team.value = data.team;
-    teamCapacity.value = data.teamCapacity;
+    greetingName.value = data.greetingName ?? "";
+    weekLabel.value = data.weekLabel ?? "";
+    stats.value = { ...emptyStats(), ...(data.stats ?? {}) };
+    goals.value = {
+      total: 0,
+      done: 0,
+      inProgress: 0,
+      pending: 0,
+      onTrack: 0,
+      ...(data.goals ?? {})
+    };
+    dayPlan.value = {
+      peopleWithGoals: 0,
+      peopleWithPlans: 0,
+      coveragePct: null,
+      ...(data.dayPlan ?? {})
+    };
+    leave.value = {
+      month: "",
+      trackedCount: 0,
+      nearCap: 0,
+      overLimit: 0,
+      byBrand: [],
+      ...(data.leave ?? {})
+    };
+    activities.value = Array.isArray(data.activities) ? data.activities : [];
+    topDelayedPics.value = Array.isArray(data.topDelayedPics) ? data.topDelayedPics : [];
+    categories.value = Array.isArray(data.categories) ? data.categories : [];
   } catch {
-    // Keep design defaults if API unavailable
-    activities.value = [];
-    team.value = [];
+    loadError.value = "Không kết nối được máy chủ.";
+  } finally {
+    loading.value = false;
   }
 });
 </script>
