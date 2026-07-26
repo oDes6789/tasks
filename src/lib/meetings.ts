@@ -1,15 +1,5 @@
 /** Meeting schedule types + seed data from legacy spreadsheet. */
 
-export type MeetingKind =
-  | "ban_dieu_hanh"
-  | "muc_tieu_tuan"
-  | "cntt"
-  | "hdqt"
-  | "coaching"
-  | "phong_van"
-  | "ap"
-  | "other";
-
 export type Weekday = 2 | 3 | 4 | 5 | 6;
 
 export interface Meeting {
@@ -26,16 +16,8 @@ export interface Meeting {
   attendees: string;
   location: string;
   note: string;
-  kind: MeetingKind;
   /** Soft block like "Full sáng" */
   isBlock: boolean;
-}
-
-export interface WeekNote {
-  id: number;
-  ownerKey: string;
-  weekStart: string;
-  text: string;
 }
 
 export interface MeetingOwner {
@@ -51,75 +33,6 @@ export const DEFAULT_MEETING_OWNER = "van-anh";
 export const MEETING_OWNERS: MeetingOwner[] = [
   { id: "van-anh", name: "Ms. Vân Anh", title: "Lịch họp cá nhân" }
 ];
-
-export const MEETING_KIND_OPTIONS: { value: MeetingKind; label: string }[] = [
-  { value: "ban_dieu_hanh", label: "Ban điều hành" },
-  { value: "muc_tieu_tuan", label: "Mục tiêu tuần" },
-  { value: "cntt", label: "CNTT" },
-  { value: "hdqt", label: "HĐQT" },
-  { value: "coaching", label: "Coaching" },
-  { value: "phong_van", label: "Phỏng vấn" },
-  { value: "ap", label: "AP" },
-  { value: "other", label: "Khác" }
-];
-
-export const MEETING_KIND_META: Record<
-  MeetingKind,
-  { label: string; color: string; bg: string; border: string }
-> = {
-  ban_dieu_hanh: {
-    label: "Ban điều hành",
-    color: "#3b1d8f",
-    bg: "#ede9fe",
-    border: "#8b5cf6"
-  },
-  muc_tieu_tuan: {
-    label: "Mục tiêu tuần",
-    color: "#1e3a5f",
-    bg: "#e0f2fe",
-    border: "#38bdf8"
-  },
-  cntt: {
-    label: "CNTT",
-    color: "#14532d",
-    bg: "#dcfce7",
-    border: "#22c55e"
-  },
-  hdqt: {
-    label: "HĐQT",
-    color: "#7c2d12",
-    bg: "#ffedd5",
-    border: "#f97316"
-  },
-  coaching: {
-    label: "Coaching",
-    color: "#831843",
-    bg: "#fce7f3",
-    border: "#ec4899"
-  },
-  phong_van: {
-    label: "Phỏng vấn",
-    color: "#164e63",
-    bg: "#cffafe",
-    border: "#06b6d4"
-  },
-  ap: {
-    label: "AP",
-    color: "#713f12",
-    bg: "#fef9c3",
-    border: "#eab308"
-  },
-  other: {
-    label: "Khác",
-    color: "#374151",
-    bg: "#f3f4f6",
-    border: "#9ca3af"
-  }
-};
-
-export function isMeetingKind(value: unknown): value is MeetingKind {
-  return typeof value === "string" && value in MEETING_KIND_META;
-}
 
 export function formatTimeRange(startMin: number, endMin: number): string {
   const fmt = (m: number) => {
@@ -164,7 +77,6 @@ export const WEEK4_START = "2026-07-20";
 export const WEEK5_START = "2026-07-27";
 
 type SeedMeeting = Omit<Meeting, "id" | "ownerKey">;
-type SeedNote = Omit<WeekNote, "id" | "ownerKey">;
 
 function sm(partial: SeedMeeting): SeedMeeting {
   return partial;
@@ -179,7 +91,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "ban_dieu_hanh",
     isBlock: true
   }),
   sm({
@@ -190,7 +101,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -201,7 +111,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -212,7 +121,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -224,7 +132,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "Mr Tiến Dũng",
     location: "Phòng họp Hải Đăng",
     note: "",
-    kind: "cntt",
     isBlock: false
   }),
   sm({
@@ -236,7 +143,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "Online - P.TCGV",
     note: "",
-    kind: "hdqt",
     isBlock: false
   }),
   sm({
@@ -248,7 +154,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "Online - P.TCGV",
     note: "",
-    kind: "hdqt",
     isBlock: false
   }),
   sm({
@@ -260,7 +165,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "Ms Bùi Thoa",
     location: "Online - P.TCGV",
     note: "",
-    kind: "coaching",
     isBlock: false
   }),
   sm({
@@ -272,7 +176,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "Mr Tiến Dũng",
     location: "Phòng họp Hải Đăng",
     note: "",
-    kind: "cntt",
     isBlock: false
   }),
   sm({
@@ -283,7 +186,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -295,7 +197,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: false
   }),
   sm({
@@ -306,7 +207,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "ban_dieu_hanh",
     isBlock: true
   }),
   sm({
@@ -317,7 +217,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -328,7 +227,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -340,7 +238,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "Mr Tiến Dũng",
     location: "Phòng họp Hải Đăng",
     note: "",
-    kind: "ap",
     isBlock: false
   }),
   sm({
@@ -351,7 +248,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -363,7 +259,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "Mr Tiến Dũng + Ms Hà Thư + Mr Hồ Nguyên",
     location: "Phòng họp Hải Đăng",
     note: "",
-    kind: "cntt",
     isBlock: false
   }),
   sm({
@@ -375,7 +270,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "Mr Đức Anh + Khoa Trần",
     location: "Online - P.TCGV",
     note: "",
-    kind: "phong_van",
     isBlock: false
   }),
   sm({
@@ -387,7 +281,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "Mr Tiến Dũng",
     location: "Phòng họp Hải Đăng",
     note: "",
-    kind: "cntt",
     isBlock: false
   }),
   sm({
@@ -398,7 +291,6 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   }),
   sm({
@@ -409,20 +301,8 @@ export const SEED_MEETINGS: SeedMeeting[] = [
     attendees: "",
     location: "",
     note: "",
-    kind: "muc_tieu_tuan",
     isBlock: true
   })
-];
-
-export const SEED_WEEK_NOTES: SeedNote[] = [
-  {
-    weekStart: WEEK5_START,
-    text: "Ms Bắc — đi du lịch → Tuần 1 tháng 8"
-  },
-  {
-    weekStart: WEEK5_START,
-    text: "Ms Thu An chỉ còn lịch chiều thứ 4"
-  }
 ];
 
 /** Pack overlapping meetings into columns (Google Calendar style). */

@@ -17,6 +17,12 @@ const PERSONNEL = [
   { name: "Ms. Kim Bắc", avatar_url: null },
   { name: "Mr. Đức Anh", avatar_url: null },
   { name: "Mr. Tiến Dũng", avatar_url: null },
+  { name: "Ms. Cẩm Tú", avatar_url: null },
+  { name: "Ms. Việt Anh", avatar_url: null },
+  { name: "Mr. Hồ Nguyên", avatar_url: null },
+  { name: "Mr. Khoa Trần", avatar_url: null },
+  { name: "Ms. Bùi Thoa", avatar_url: null },
+  { name: "Ms. Thu An", avatar_url: null },
   { name: "Ms. Thu Hà", avatar_url: null },
   { name: "Mr. Minh Quân", avatar_url: null },
   { name: "Ms. Lan Anh", avatar_url: null }
@@ -154,6 +160,36 @@ export async function migrate(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_meeting_notes_owner_week
       ON meeting_week_notes (owner_key, week_start, id);
+
+    CREATE TABLE IF NOT EXISTS saturday_leave_regs (
+      id SERIAL PRIMARY KEY,
+      work_date DATE NOT NULL,
+      person_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'full',
+      updated_by TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (work_date, person_name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_saturday_leave_date
+      ON saturday_leave_regs (work_date, person_name);
+
+    CREATE TABLE IF NOT EXISTS app_users (
+      id SERIAL PRIMARY KEY,
+      edutalk_user_id INTEGER NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL DEFAULT '',
+      avatar_url TEXT,
+      employee_code INTEGER,
+      parent_id INTEGER,
+      manager_json JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_app_users_edutalk
+      ON app_users (edutalk_user_id);
   `);
 
   for (const cat of CATEGORIES) {

@@ -4,7 +4,13 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { createSessionToken, verifySessionToken } from "./sessionToken";
-import { getUserById, toPublicUser, upsertUserFromEdutalk } from "./users";
+import {
+  getUserById,
+  loadUsersFromDb,
+  toPublicUser,
+  upsertUserFromEdutalk,
+  type EdutalkUserInput
+} from "./users";
 import { migrate } from "./migrate";
 import { ensureDatabase } from "./ensureDatabase";
 import { createWeeklyTask, deleteWeeklyTask, getTaskBoard, updateWeeklyTask } from "./tasksRepo";
@@ -23,29 +29,34 @@ import {
 } from "./dayPlansRepo";
 import {
   createMeeting,
-  createWeekNote,
   deleteMeeting,
-  deleteWeekNote,
   listMeetings,
   updateMeeting
 } from "./meetingsRepo";
+import {
+  clearSaturdayLeave,
+  listSaturdayLeave,
+  upsertSaturdayLeave
+} from "./saturdayLeaveRepo";
 import { resolveWeekStart } from "../src/lib/week";
 import { DEFAULT_MEETING_OWNER } from "../src/lib/meetings";
-
-dotenv.config();
-if (process.env.NODE_ENV === "production") {
-  dotenv.config({ path: ".env.production", override: true });
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, "..");
+
+dotenv.config({ path: path.resolve(root, ".env") });
+if (process.env.NODE_ENV === "production") {
+  dotenv.config({ path: path.resolve(root, ".env.production"), override: true });
+}
 
 const app = express();
 app.use(express.json());
 
 const PORT = Number(process.env.PORT || 3000);
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_OAUTH_CLIENT_ID = "tochuc-giaovien";
+const DEFAULT_OAUTH_CLIENT_SECRET = "cdc8a13d-facf-4a3d-8af8-0c9fd96f4c09";
 
 function getBearerToken(req: express.Request): string | null {
   const header = req.headers.authorization;
@@ -77,9 +88,7 @@ function getOAuthRedirectUri(): string {
   );
 }
 
-async function verifyEdutalkToken(
-  token: string
-): Promise<{ id: number; name: string; email: string } | null> {
+async function verifyEdutalkToken(token: string): Promise<EdutalkUserInput | null> {
   const apiBase = getEdutalkApiBase();
   if (!apiBase) {
     console.warn("EDUTALK_API_URL is not configured.");
@@ -93,7 +102,7 @@ async function verifyEdutalkToken(
       body: JSON.stringify({ token })
     });
     if (!res.ok) return null;
-    const payload = (await res.json()) as { data?: { id: number; name: string; email: string } };
+    const payload = (await res.json()) as { data?: EdutalkUserInput };
     return payload.data ?? null;
   } catch (err) {
     console.error("Edutalk token verification failed:", err);
@@ -106,7 +115,7 @@ async function exchangeEdutalkCode(
   redirectUri: string
 ): Promise<{
   token: string | null;
-  user?: { id: number; name: string; email: string };
+  user?: EdutalkUserInput;
   error?: string;
 }> {
   const apiBase = getEdutalkApiBase();
@@ -114,8 +123,8 @@ async function exchangeEdutalkCode(
     return { token: null, error: "Chưa cấu hình EDUTALK_API_URL trên server." };
   }
 
-  const clientId = process.env.OAUTH_CLIENT_ID || "tochuc-giaovien";
-  const clientSecret = process.env.OAUTH_CLIENT_SECRET || "change-me";
+  const clientId = process.env.OAUTH_CLIENT_ID || DEFAULT_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.OAUTH_CLIENT_SECRET || DEFAULT_OAUTH_CLIENT_SECRET;
   const normalizedRedirectUri = normalizeRedirectUri(redirectUri);
 
   try {
@@ -130,12 +139,16 @@ async function exchangeEdutalkCode(
       })
     });
     const payload = (await res.json().catch(() => ({}))) as {
-      data?: { token?: string; user?: { id: number; name: string; email: string } };
+      data?: { token?: string; user?: EdutalkUserInput };
       message?: string;
     };
 
     if (!res.ok) {
-      console.error("Edutalk OAuth token exchange failed:", res.status, payload);
+      console.error("Edutalk OAuth token exchange failed:", res.status, payload, {
+        client_id: clientId,
+        redirect_uri: normalizedRedirectUri,
+        api: `${apiBase}/adn/oauth/token`
+      });
       return {
         token: null,
         error: payload.message ?? `Đổi mã OAuth thất bại (HTTP ${res.status}).`
@@ -165,7 +178,7 @@ app.post("/api/auth/login/edutalk", async (req, res) => {
   );
 
   let edutalkToken = typeof token === "string" ? token : null;
-  let edutalkUser: { id: number; name: string; email: string } | null = null;
+  let edutalkUser: EdutalkUserInput | null = null;
 
   if (!edutalkToken && typeof code === "string") {
     const exchange = await exchangeEdutalkCode(code, redirectUri);
@@ -185,14 +198,26 @@ app.post("/api/auth/login/edutalk", async (req, res) => {
   if (!edutalkUser) {
     edutalkUser = await verifyEdutalkToken(edutalkToken);
   }
-  if (!edutalkUser) {
+  if (!edutalkUser?.id || !edutalkUser.name) {
     return res.status(401).json({ error: "Phiên đăng nhập Edutalk không hợp lệ hoặc đã hết hạn." });
   }
 
-  const user = upsertUserFromEdutalk(edutalkUser);
-  const sessionToken = createSessionToken(user.id, SESSION_TTL_MS);
-
-  res.json({ token: sessionToken, user: toPublicUser(user) });
+  try {
+    const user = await upsertUserFromEdutalk({
+      id: edutalkUser.id,
+      name: edutalkUser.name,
+      email: edutalkUser.email ?? "",
+      employeeCode: edutalkUser.employeeCode,
+      image: edutalkUser.image,
+      parent_id: edutalkUser.parent_id,
+      manager: edutalkUser.manager
+    });
+    const sessionToken = createSessionToken(user.id, SESSION_TTL_MS);
+    res.json({ token: sessionToken, user: toPublicUser(user) });
+  } catch (err) {
+    console.error("Failed to upsert Edutalk user:", err);
+    res.status(500).json({ error: "Không lưu được thông tin người dùng." });
+  }
 });
 
 app.get("/api/auth/me", (req, res) => {
@@ -208,12 +233,17 @@ app.post("/api/auth/logout", (_req, res) => {
 });
 
 if (process.env.NODE_ENV !== "production") {
-  app.post("/api/auth/login/dev", (req, res) => {
+  app.post("/api/auth/login/dev", async (req, res) => {
     const name = typeof req.body?.name === "string" ? req.body.name : "John Doe";
     const email = typeof req.body?.email === "string" ? req.body.email : "john@edutalk.edu.vn";
-    const user = upsertUserFromEdutalk({ id: 999001, name, email });
-    const sessionToken = createSessionToken(user.id, SESSION_TTL_MS);
-    res.json({ token: sessionToken, user: toPublicUser(user) });
+    try {
+      const user = await upsertUserFromEdutalk({ id: 999001, name, email });
+      const sessionToken = createSessionToken(user.id, SESSION_TTL_MS);
+      res.json({ token: sessionToken, user: toPublicUser(user) });
+    } catch (err) {
+      console.error("Dev login failed:", err);
+      res.status(500).json({ error: "Không tạo được phiên dev." });
+    }
   });
 }
 
@@ -689,7 +719,6 @@ app.post("/api/meetings", async (req, res) => {
       attendees: req.body?.attendees,
       location: req.body?.location,
       note: req.body?.note,
-      kind: req.body?.kind,
       isBlock: req.body?.isBlock
     });
     res.status(201).json({ item });
@@ -724,7 +753,6 @@ app.patch("/api/meetings/:id", async (req, res) => {
       attendees: req.body?.attendees,
       location: req.body?.location,
       note: req.body?.note,
-      kind: req.body?.kind,
       isBlock: req.body?.isBlock
     });
     if (!item) {
@@ -764,55 +792,76 @@ app.delete("/api/meetings/:id", async (req, res) => {
   }
 });
 
-app.post("/api/meetings/notes", async (req, res) => {
+app.get("/api/saturday-leave", async (req, res) => {
   const user = getSessionUser(req);
   if (!user) {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
 
   try {
-    const note = await createWeekNote({
-      ownerKey: req.body?.ownerKey,
-      weekStart: req.body?.weekStart,
-      text: req.body?.text
-    });
-    res.status(201).json({ note });
+    const board = await listSaturdayLeave(req.query.month);
+    res.json(board);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "";
-    if (message === "NOTE_REQUIRED") {
-      return res.status(400).json({ error: "Ghi chú trống." });
-    }
-    console.error("Failed to create meeting note:", err);
-    res.status(500).json({ error: "Không thêm được ghi chú." });
+    console.error("Failed to load saturday leave:", err);
+    res.status(500).json({ error: "Không tải được lịch nghỉ Thứ 7." });
   }
 });
 
-app.delete("/api/meetings/notes/:id", async (req, res) => {
+app.put("/api/saturday-leave", async (req, res) => {
   const user = getSessionUser(req);
   if (!user) {
     return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
 
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id < 1) {
-    return res.status(400).json({ error: "id không hợp lệ." });
+  try {
+    const item = await upsertSaturdayLeave({
+      workDate: req.body?.workDate,
+      personName: req.body?.personName,
+      status: req.body?.status,
+      updatedBy: user.name || user.email || "unknown"
+    });
+    res.json({ item });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message === "INVALID_DATE") {
+      return res.status(400).json({ error: "Ngày không hợp lệ." });
+    }
+    if (message === "NOT_SATURDAY") {
+      return res.status(400).json({ error: "Chỉ đăng ký được ngày Thứ 7." });
+    }
+    if (message === "UNKNOWN_PERSON") {
+      return res.status(400).json({ error: "Nhân sự không có trong danh sách." });
+    }
+    if (message === "INVALID_STATUS") {
+      return res.status(400).json({ error: "Trạng thái không hợp lệ." });
+    }
+    console.error("Failed to save saturday leave:", err);
+    res.status(500).json({ error: "Không lưu được lịch nghỉ Thứ 7." });
+  }
+});
+
+app.delete("/api/saturday-leave", async (req, res) => {
+  const user = getSessionUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vui lòng đăng nhập." });
   }
 
   try {
-    const ok = await deleteWeekNote(id);
-    if (!ok) {
-      return res.status(404).json({ error: "Không tìm thấy ghi chú." });
-    }
-    res.json({ ok: true });
+    const ok = await clearSaturdayLeave({
+      workDate: req.body?.workDate ?? req.query.workDate,
+      personName: req.body?.personName ?? req.query.personName
+    });
+    res.json({ ok });
   } catch (err) {
-    console.error("Failed to delete meeting note:", err);
-    res.status(500).json({ error: "Không xóa được ghi chú." });
+    console.error("Failed to clear saturday leave:", err);
+    res.status(500).json({ error: "Không xóa được đăng ký nghỉ." });
   }
 });
 
 async function start() {
   await ensureDatabase();
   await migrate();
+  await loadUsersFromDb();
   console.log("PostgreSQL schema ready.");
 
   if (process.env.NODE_ENV !== "production") {

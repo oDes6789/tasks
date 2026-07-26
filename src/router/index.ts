@@ -51,6 +51,11 @@ const router = createRouter({
           path: "lich-hop",
           name: "meeting-schedule",
           component: () => import("@/pages/MeetingSchedulePage.vue")
+        },
+        {
+          path: "nghi-thu-7",
+          name: "saturday-leave",
+          component: () => import("@/pages/SaturdayLeavePage.vue")
         }
       ]
     },

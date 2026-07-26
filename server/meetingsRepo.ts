@@ -2,11 +2,7 @@ import { query } from "./db";
 import {
   DEFAULT_MEETING_OWNER,
   SEED_MEETINGS,
-  SEED_WEEK_NOTES,
-  isMeetingKind,
   type Meeting,
-  type MeetingKind,
-  type WeekNote,
   type Weekday
 } from "../src/lib/meetings";
 import { resolveWeekStart } from "../src/lib/week";
@@ -22,15 +18,7 @@ interface MeetingRow {
   attendees: string;
   location: string;
   note: string;
-  kind: string;
   is_block: boolean;
-}
-
-interface NoteRow {
-  id: number;
-  owner_key: string;
-  week_start: string;
-  text: string;
 }
 
 const MEETING_SELECT = `
@@ -44,7 +32,6 @@ const MEETING_SELECT = `
   attendees,
   location,
   note,
-  kind,
   is_block
 `;
 
@@ -76,17 +63,7 @@ function mapMeeting(row: MeetingRow): Meeting {
     attendees: row.attendees ?? "",
     location: row.location ?? "",
     note: row.note ?? "",
-    kind: (isMeetingKind(row.kind) ? row.kind : "other") as MeetingKind,
     isBlock: Boolean(row.is_block)
-  };
-}
-
-function mapNote(row: NoteRow): WeekNote {
-  return {
-    id: row.id,
-    ownerKey: row.owner_key,
-    weekStart: asIsoDate(row.week_start),
-    text: row.text ?? ""
   };
 }
 
@@ -110,10 +87,10 @@ export async function ensureMeetingSeed(ownerKey = DEFAULT_MEETING_OWNER): Promi
       `
       INSERT INTO meetings (
         owner_key, week_start, weekday, start_min, end_min,
-        title, attendees, location, note, kind, is_block
+        title, attendees, location, note, is_block
       ) VALUES (
         $1, $2::date, $3, $4, $5,
-        $6, $7, $8, $9, $10, $11
+        $6, $7, $8, $9, $10
       )
       `,
       [
@@ -126,19 +103,8 @@ export async function ensureMeetingSeed(ownerKey = DEFAULT_MEETING_OWNER): Promi
         seed.attendees,
         seed.location,
         seed.note,
-        seed.kind,
         seed.isBlock
       ]
-    );
-  }
-
-  for (const seed of SEED_WEEK_NOTES) {
-    await query(
-      `
-      INSERT INTO meeting_week_notes (owner_key, week_start, text)
-      VALUES ($1, $2::date, $3)
-      `,
-      [key, seed.weekStart, seed.text]
     );
   }
 }
@@ -146,36 +112,24 @@ export async function ensureMeetingSeed(ownerKey = DEFAULT_MEETING_OWNER): Promi
 export async function listMeetings(
   ownerKeyRaw: unknown,
   weekRaw: unknown
-): Promise<{ meetings: Meeting[]; notes: WeekNote[]; weekStart: string }> {
+): Promise<{ meetings: Meeting[]; weekStart: string }> {
   const ownerKey = String(ownerKeyRaw ?? DEFAULT_MEETING_OWNER).trim() || DEFAULT_MEETING_OWNER;
   const week = resolveWeekStart(weekRaw);
   await ensureMeetingSeed(ownerKey);
 
-  const [meetingsRes, notesRes] = await Promise.all([
-    query<MeetingRow>(
-      `
-      SELECT ${MEETING_SELECT}
-      FROM meetings
-      WHERE owner_key = $1 AND week_start = $2::date
-      ORDER BY weekday ASC, start_min ASC, id ASC
-      `,
-      [ownerKey, week.weekStart]
-    ),
-    query<NoteRow>(
-      `
-      SELECT id, owner_key, week_start::text AS week_start, text
-      FROM meeting_week_notes
-      WHERE owner_key = $1 AND week_start = $2::date
-      ORDER BY id ASC
-      `,
-      [ownerKey, week.weekStart]
-    )
-  ]);
+  const meetingsRes = await query<MeetingRow>(
+    `
+    SELECT ${MEETING_SELECT}
+    FROM meetings
+    WHERE owner_key = $1 AND week_start = $2::date
+    ORDER BY weekday ASC, start_min ASC, id ASC
+    `,
+    [ownerKey, week.weekStart]
+  );
 
   return {
     weekStart: week.weekStart,
-    meetings: meetingsRes.rows.map(mapMeeting),
-    notes: notesRes.rows.map(mapNote)
+    meetings: meetingsRes.rows.map(mapMeeting)
   };
 }
 
@@ -189,24 +143,22 @@ export async function createMeeting(input: {
   attendees?: string;
   location?: string;
   note?: string;
-  kind?: string;
   isBlock?: boolean;
 }): Promise<Meeting> {
   const ownerKey = String(input.ownerKey ?? DEFAULT_MEETING_OWNER).trim() || DEFAULT_MEETING_OWNER;
   const week = resolveWeekStart(input.weekStart);
   const weekday = asWeekday(input.weekday);
   const range = normalizeRange(clampMin(input.startMin, 9 * 60), clampMin(input.endMin, 10 * 60));
-  const kind = isMeetingKind(input.kind) ? input.kind : "other";
   const title = String(input.title ?? "").trim() || "Họp mới";
 
   const res = await query<MeetingRow>(
     `
     INSERT INTO meetings (
       owner_key, week_start, weekday, start_min, end_min,
-      title, attendees, location, note, kind, is_block
+      title, attendees, location, note, is_block
     ) VALUES (
       $1, $2::date, $3, $4, $5,
-      $6, $7, $8, $9, $10, $11
+      $6, $7, $8, $9, $10
     )
     RETURNING ${MEETING_SELECT}
     `,
@@ -220,7 +172,6 @@ export async function createMeeting(input: {
       String(input.attendees ?? "").trim(),
       String(input.location ?? "").trim(),
       String(input.note ?? "").trim(),
-      kind,
       Boolean(input.isBlock)
     ]
   );
@@ -239,7 +190,6 @@ export async function updateMeeting(
     attendees?: string;
     location?: string;
     note?: string;
-    kind?: string;
     isBlock?: boolean;
   }
 ): Promise<Meeting | null> {
@@ -258,12 +208,6 @@ export async function updateMeeting(
     patch.startMin !== undefined ? clampMin(patch.startMin, cur.startMin) : cur.startMin,
     patch.endMin !== undefined ? clampMin(patch.endMin, cur.endMin) : cur.endMin
   );
-  const kind =
-    patch.kind !== undefined
-      ? isMeetingKind(patch.kind)
-        ? patch.kind
-        : cur.kind
-      : cur.kind;
 
   const res = await query<MeetingRow>(
     `
@@ -276,8 +220,7 @@ export async function updateMeeting(
       attendees = $7,
       location = $8,
       note = $9,
-      kind = $10,
-      is_block = $11,
+      is_block = $10,
       updated_at = NOW()
     WHERE id = $1
     RETURNING ${MEETING_SELECT}
@@ -292,7 +235,6 @@ export async function updateMeeting(
       patch.attendees !== undefined ? String(patch.attendees).trim() : cur.attendees,
       patch.location !== undefined ? String(patch.location).trim() : cur.location,
       patch.note !== undefined ? String(patch.note).trim() : cur.note,
-      kind,
       patch.isBlock !== undefined ? Boolean(patch.isBlock) : cur.isBlock
     ]
   );
@@ -302,31 +244,5 @@ export async function updateMeeting(
 
 export async function deleteMeeting(id: number): Promise<boolean> {
   const res = await query(`DELETE FROM meetings WHERE id = $1`, [id]);
-  return (res.rowCount ?? 0) > 0;
-}
-
-export async function createWeekNote(input: {
-  ownerKey?: string;
-  weekStart?: string;
-  text: string;
-}): Promise<WeekNote> {
-  const ownerKey = String(input.ownerKey ?? DEFAULT_MEETING_OWNER).trim() || DEFAULT_MEETING_OWNER;
-  const week = resolveWeekStart(input.weekStart);
-  const text = String(input.text ?? "").trim();
-  if (!text) throw new Error("NOTE_REQUIRED");
-
-  const res = await query<NoteRow>(
-    `
-    INSERT INTO meeting_week_notes (owner_key, week_start, text)
-    VALUES ($1, $2::date, $3)
-    RETURNING id, owner_key, week_start::text AS week_start, text
-    `,
-    [ownerKey, week.weekStart, text]
-  );
-  return mapNote(res.rows[0]);
-}
-
-export async function deleteWeekNote(id: number): Promise<boolean> {
-  const res = await query(`DELETE FROM meeting_week_notes WHERE id = $1`, [id]);
   return (res.rowCount ?? 0) > 0;
 }

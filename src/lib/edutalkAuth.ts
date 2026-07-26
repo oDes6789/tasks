@@ -65,7 +65,7 @@ export function buildEdutalkAuthorizeUrl(): string {
     state
   });
 
-  return `${getNoiboOrigin()}/adn-authorize?${params.toString()}`;
+  return `${getNoiboOrigin()}/authorize?${params.toString()}`;
 }
 
 export function startEdutalkLogin(): void {

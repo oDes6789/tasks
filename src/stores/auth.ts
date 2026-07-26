@@ -3,11 +3,22 @@ import { computed, ref } from "vue";
 import { authHeaders, clearStoredToken, getStoredToken, setStoredToken } from "@/lib/auth";
 import { getOAuthRedirectUri } from "@/lib/edutalkAuth";
 
+export interface AuthManager {
+  id: number;
+  name: string;
+  email: string | null;
+  avatarUrl: string | null;
+  employeeCode: number | null;
+}
+
 export interface AuthUser {
   id: number;
   name: string;
   email: string;
   avatarUrl: string | null;
+  employeeCode: number | null;
+  parentId: number | null;
+  manager: AuthManager | null;
 }
 
 export const useAuthStore = defineStore("auth", () => {
