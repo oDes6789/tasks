@@ -8,42 +8,67 @@
         </p>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="month-nav" ref="monthNavEl">
         <button
           type="button"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/50 bg-white text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+          class="month-nav-arrow"
           aria-label="Tháng trước"
           @click="goMonth(-1)"
         >
           <Icon name="chevron_left" icon-class="text-[22px]" />
         </button>
-        <DatePicker
-          v-model="monthDate"
-          view="month"
-          dateFormat="mm/yy"
-          :manualInput="false"
-          showIcon
-          iconDisplay="input"
-          placeholder="Chọn tháng"
-          class="month-datepicker"
-          inputClass="month-datepicker-input"
-          @update:modelValue="onMonthPick"
-        />
+
+        <div class="month-picker">
+          <button
+            type="button"
+            class="month-picker-trigger"
+            :aria-expanded="monthPickerOpen"
+            aria-haspopup="dialog"
+            @click="toggleMonthPicker"
+          >
+            <Icon name="calendar_month" icon-class="text-[18px] text-primary" />
+            <span class="month-picker-label">{{ monthPickerLabel }}</span>
+            <Icon
+              name="expand_more"
+              icon-class="text-[18px] text-outline transition-transform"
+              :class="{ 'rotate-180': monthPickerOpen }"
+            />
+          </button>
+
+          <div v-if="monthPickerOpen" class="month-picker-panel" role="dialog" aria-label="Chọn tháng">
+            <div class="month-picker-year">
+              <button type="button" class="month-picker-year-btn" aria-label="Năm trước" @click="pickerYear -= 1">
+                <Icon name="chevron_left" icon-class="text-[20px]" />
+              </button>
+              <span class="month-picker-year-label">{{ pickerYear }}</span>
+              <button type="button" class="month-picker-year-btn" aria-label="Năm sau" @click="pickerYear += 1">
+                <Icon name="chevron_right" icon-class="text-[20px]" />
+              </button>
+            </div>
+            <div class="month-picker-grid">
+              <button
+                v-for="m in 12"
+                :key="m"
+                type="button"
+                class="month-picker-cell"
+                :class="{ 'is-active': isPickerMonthActive(m), 'is-current': isPickerMonthCurrent(m) }"
+                @click="pickMonth(m)"
+              >
+                Thg {{ m }}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <button
           type="button"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/50 bg-white text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary"
+          class="month-nav-arrow"
           aria-label="Tháng sau"
           @click="goMonth(1)"
         >
           <Icon name="chevron_right" icon-class="text-[22px]" />
         </button>
-        <button
-          type="button"
-          class="inline-flex h-10 items-center gap-1.5 rounded-full bg-primary/10 px-3.5 text-[12px] font-semibold text-primary transition hover:bg-primary/15"
-          @click="goThisMonth"
-        >
-          Tháng này
-        </button>
+        <button type="button" class="month-nav-today" @click="goThisMonth">Tháng này</button>
       </div>
     </header>
 
@@ -255,8 +280,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import DatePicker from "primevue/datepicker";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useToast } from "primevue/usetoast";
 import Icon from "@/components/Icon.vue";
 import { authHeaders } from "@/lib/auth";
@@ -268,6 +292,7 @@ import {
   formatShortDate,
   LEAVE_STATUS_OPTIONS,
   monthLabelVi,
+  parseMonthKey,
   resolveMonthKey,
   shiftMonth,
   toMonthKey,
@@ -281,7 +306,9 @@ const toast = useToast();
 const auth = useAuthStore();
 
 const monthKey = ref(toMonthKey(new Date()));
-const monthDate = ref<Date>(new Date());
+const monthPickerOpen = ref(false);
+const pickerYear = ref(new Date().getFullYear());
+const monthNavEl = ref<HTMLElement | null>(null);
 const saturdays = ref<string[]>([]);
 const roster = ref<LeavePerson[]>([]);
 const entries = ref<SaturdayLeaveEntry[]>([]);
@@ -298,6 +325,12 @@ const statusMap = computed(() => {
 });
 
 const monthTitle = computed(() => monthLabelVi(monthKey.value));
+
+const monthPickerLabel = computed(() => {
+  const parsed = parseMonthKey(monthKey.value);
+  if (!parsed) return monthKey.value;
+  return `Tháng ${String(parsed.month).padStart(2, "0")} · ${parsed.year}`;
+});
 
 const sections = computed(() => {
   const brands: LeaveBrand[] = ["general", "im", "ec"];
@@ -427,25 +460,51 @@ function statusAbbrev(status: LeaveStatus): string {
   return map[status];
 }
 
-function syncMonthDateFromKey() {
-  const [y, m] = monthKey.value.split("-").map(Number);
-  monthDate.value = new Date(y, m - 1, 1);
+function syncPickerYearFromKey() {
+  const parsed = parseMonthKey(monthKey.value);
+  if (parsed) pickerYear.value = parsed.year;
+}
+
+function toggleMonthPicker() {
+  monthPickerOpen.value = !monthPickerOpen.value;
+  if (monthPickerOpen.value) syncPickerYearFromKey();
+}
+
+function closeMonthPicker() {
+  monthPickerOpen.value = false;
+}
+
+function isPickerMonthActive(month: number) {
+  const parsed = parseMonthKey(monthKey.value);
+  return !!parsed && parsed.year === pickerYear.value && parsed.month === month;
+}
+
+function isPickerMonthCurrent(month: number) {
+  const now = new Date();
+  return pickerYear.value === now.getFullYear() && month === now.getMonth() + 1;
+}
+
+function pickMonth(month: number) {
+  monthKey.value = `${pickerYear.value}-${String(month).padStart(2, "0")}`;
+  closeMonthPicker();
 }
 
 function goMonth(delta: number) {
   monthKey.value = shiftMonth(monthKey.value, delta);
-  syncMonthDateFromKey();
+  syncPickerYearFromKey();
 }
 
 function goThisMonth() {
   monthKey.value = toMonthKey(new Date());
-  syncMonthDateFromKey();
+  syncPickerYearFromKey();
+  closeMonthPicker();
 }
 
-function onMonthPick(value: Date | Date[] | (Date | null)[] | null | undefined) {
-  const d = Array.isArray(value) ? value.find((x): x is Date => x instanceof Date) : value;
-  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return;
-  monthKey.value = toMonthKey(d);
+function onDocPointerDown(event: PointerEvent) {
+  if (!monthPickerOpen.value) return;
+  const target = event.target as Node | null;
+  if (target && monthNavEl.value?.contains(target)) return;
+  closeMonthPicker();
 }
 
 async function loadBoard() {
@@ -468,7 +527,7 @@ async function loadBoard() {
     saturdays.value = data.saturdays;
     roster.value = Array.isArray(data.roster) ? data.roster : [];
     entries.value = data.entries;
-    syncMonthDateFromKey();
+    syncPickerYearFromKey();
   } catch (err) {
     toast.add({
       severity: "error",
@@ -567,8 +626,13 @@ watch(monthKey, () => {
 });
 
 onMounted(() => {
-  syncMonthDateFromKey();
+  syncPickerYearFromKey();
+  document.addEventListener("pointerdown", onDocPointerDown);
   void loadBoard();
+});
+
+onUnmounted(() => {
+  document.removeEventListener("pointerdown", onDocPointerDown);
 });
 </script>
 
@@ -977,13 +1041,154 @@ onMounted(() => {
   50% { opacity: 1; }
 }
 
-:deep(.month-datepicker) {
-  width: 9.5rem;
+.month-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
 }
-:deep(.month-datepicker-input) {
+
+.month-nav-arrow {
+  display: inline-flex;
   height: 2.5rem;
-  border-radius: 999px !important;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(199, 196, 215, 0.55);
+  background: #fff;
+  color: #64748b;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.month-nav-arrow:hover {
+  background: #f1f5f9;
+  color: #4648d4;
+  border-color: rgba(70, 72, 212, 0.25);
+}
+
+.month-nav-today {
+  display: inline-flex;
+  height: 2.5rem;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 0.95rem;
+  background: rgba(70, 72, 212, 0.1);
+  color: #4648d4;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.15s ease;
+}
+.month-nav-today:hover {
+  background: rgba(70, 72, 212, 0.16);
+}
+
+.month-picker {
+  position: relative;
+}
+
+.month-picker-trigger {
+  display: inline-flex;
+  height: 2.5rem;
+  min-width: 11.5rem;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(199, 196, 215, 0.55);
+  background: #fff;
+  padding: 0 0.75rem 0 0.85rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.month-picker-trigger:hover {
+  border-color: rgba(70, 72, 212, 0.35);
+}
+.month-picker-trigger[aria-expanded="true"] {
+  border-color: #4648d4;
+  box-shadow: 0 0 0 3px rgba(70, 72, 212, 0.14);
+}
+
+.month-picker-label {
+  flex: 1;
+  text-align: left;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  color: #0b1c30;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.month-picker-panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 40;
+  width: 17.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(199, 196, 215, 0.55);
+  background: #fff;
+  padding: 0.75rem;
+  box-shadow:
+    0 10px 15px -3px rgb(15 23 42 / 0.1),
+    0 4px 6px -4px rgb(15 23 42 / 0.08);
+}
+
+.month-picker-year {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+  padding: 0 0.15rem;
+}
+
+.month-picker-year-label {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0b1c30;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-picker-year-btn {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #64748b;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.month-picker-year-btn:hover {
+  background: #f1f5f9;
+  color: #4648d4;
+}
+
+.month-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.month-picker-cell {
+  height: 2.35rem;
+  border-radius: 0.65rem;
+  border: 1px solid transparent;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.month-picker-cell:hover {
+  background: #eef2ff;
+  color: #3730a3;
+}
+.month-picker-cell.is-current:not(.is-active) {
+  border-color: rgba(70, 72, 212, 0.35);
+  color: #4648d4;
+}
+.month-picker-cell.is-active {
+  background: #4648d4;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(70, 72, 212, 0.28);
 }
 </style>
