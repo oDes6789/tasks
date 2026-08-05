@@ -1,5 +1,5 @@
-const DEFAULT_NOIBO_URL = "https://noibo.edutalk.edu.vn/";
-const DEFAULT_CLIENT_ID = "tochuc-giaovien";
+const DEFAULT_NOIBO_URL = import.meta.env.VITE_NOIBO_URL || "http://noibo.edutalk.edu.vn/";
+const DEFAULT_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || "tochuc-giaovien";
 const CALLBACK_PATH = "/dang-nhap/callback";
 
 export function getNoiboUrl(): string {

@@ -2,7 +2,8 @@ import { query } from "./db";
 import {
   addDays,
   formatWeekLabel,
-  resolveWeekStart,
+  getWeekInfo,
+  parseIsoDate,
   toIsoDate
 } from "../src/lib/week";
 import {
@@ -42,6 +43,7 @@ export interface DashboardLeaveBrandStat {
 
 export interface DashboardSummary {
   greetingName: string;
+  period: DashboardPeriod;
   weekStart: string;
   weekLabel: string;
   stats: {
@@ -84,6 +86,8 @@ export interface DashboardSummary {
   categories: DashboardCategoryStat[];
   activities: DashboardActivity[];
 }
+
+export type DashboardPeriod = "week" | "month" | "quarter" | "year";
 
 interface CountRow {
   key: string;
@@ -128,6 +132,119 @@ function countMap(rows: CountRow[]): Map<string, number> {
   return map;
 }
 
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function startOfQuarter(date: Date): Date {
+  const month = date.getMonth();
+  const quarterStartMonth = Math.floor(month / 3) * 3;
+  return new Date(date.getFullYear(), quarterStartMonth, 1);
+}
+
+function startOfYear(date: Date): Date {
+  return new Date(date.getFullYear(), 0, 1);
+}
+
+interface PeriodRange {
+  period: DashboardPeriod;
+  label: string;
+  start: Date;
+  endExclusive: Date;
+  compareStart: Date;
+  compareEndExclusive: Date;
+  weekStart: string;
+}
+
+function listMonthKeysBetween(start: Date, endExclusive: Date): string[] {
+  const keys: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cursor < endExclusive) {
+    keys.push(toMonthKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return keys;
+}
+
+function formatMonthLabel(date: Date): string {
+  return `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`;
+}
+
+function formatQuarterLabel(date: Date): string {
+  return `Quý ${Math.floor(date.getMonth() / 3) + 1}/${date.getFullYear()}`;
+}
+
+function formatYearLabel(date: Date): string {
+  return `Năm ${date.getFullYear()}`;
+}
+
+function resolvePeriodRange(
+  weekRaw: unknown,
+  periodRaw: unknown,
+  refRaw: unknown
+): PeriodRange {
+  const requestedPeriod: DashboardPeriod =
+    periodRaw === "month" || periodRaw === "quarter" || periodRaw === "year" ? periodRaw : "week";
+
+  const refIso =
+    typeof refRaw === "string" && refRaw.trim() ? String(refRaw).trim() : typeof weekRaw === "string" ? String(weekRaw).trim() : "";
+  const referenceDate = parseIsoDate(refIso) ?? new Date();
+
+  const week = getWeekInfo(referenceDate);
+  const weekStart = week.weekStart;
+
+  if (requestedPeriod === "week") {
+    const start = week.start;
+    return {
+      period: "week",
+      label: week.weekLabel || formatWeekLabel(start),
+      start,
+      endExclusive: addDays(start, 7),
+      compareStart: addDays(start, -7),
+      compareEndExclusive: start,
+      weekStart
+    };
+  }
+
+  const anchor = referenceDate;
+  if (requestedPeriod === "month") {
+    const start = startOfMonth(anchor);
+    return {
+      period: "month",
+      label: formatMonthLabel(start),
+      start,
+      endExclusive: new Date(start.getFullYear(), start.getMonth() + 1, 1),
+      compareStart: new Date(start.getFullYear(), start.getMonth() - 1, 1),
+      compareEndExclusive: start,
+      weekStart
+    };
+  }
+
+  if (requestedPeriod === "quarter") {
+    const start = startOfQuarter(anchor);
+    return {
+      period: "quarter",
+      label: formatQuarterLabel(start),
+      start,
+      endExclusive: new Date(start.getFullYear(), start.getMonth() + 3, 1),
+      compareStart: new Date(start.getFullYear(), start.getMonth() - 3, 1),
+      compareEndExclusive: start,
+      weekStart
+    };
+  }
+
+  const start = startOfYear(anchor);
+  return {
+    period: "year",
+    label: formatYearLabel(start),
+    start,
+    endExclusive: new Date(start.getFullYear() + 1, 0, 1),
+    compareStart: new Date(start.getFullYear() - 1, 0, 1),
+    compareEndExclusive: start,
+    weekStart
+  };
+}
+
 async function taskStatusCounts(weekStart: string): Promise<Map<string, number>> {
   const res = await query<CountRow>(
     `
@@ -137,6 +254,20 @@ async function taskStatusCounts(weekStart: string): Promise<Map<string, number>>
     GROUP BY status
     `,
     [weekStart]
+  );
+  return countMap(res.rows);
+}
+
+async function taskStatusCountsInRange(start: string, endExclusive: string): Promise<Map<string, number>> {
+  const res = await query<CountRow>(
+    `
+    SELECT status AS key, COUNT(*)::int AS cnt
+    FROM weekly_tasks
+    WHERE week_start >= $1::date
+      AND week_start < $2::date
+    GROUP BY status
+    `,
+    [start, endExclusive]
   );
   return countMap(res.rows);
 }
@@ -155,6 +286,21 @@ async function taskKpiCounts(weekStart: string): Promise<Map<string, number>> {
   return countMap(res.rows);
 }
 
+async function taskKpiCountsInRange(start: string, endExclusive: string): Promise<Map<string, number>> {
+  const res = await query<CountRow>(
+    `
+    SELECT kpi AS key, COUNT(*)::int AS cnt
+    FROM weekly_tasks
+    WHERE week_start >= $1::date
+      AND week_start < $2::date
+      AND kpi IN ('achieved', 'not_achieved', 'delayed')
+    GROUP BY kpi
+    `,
+    [start, endExclusive]
+  );
+  return countMap(res.rows);
+}
+
 async function backlogOpenCount(weekStart: string): Promise<number> {
   const res = await query<{ cnt: string | number }>(
     `
@@ -169,6 +315,21 @@ async function backlogOpenCount(weekStart: string): Promise<number> {
   return asInt(res.rows[0]?.cnt);
 }
 
+async function backlogOpenCountInRange(start: string, endExclusive: string): Promise<number> {
+  const res = await query<{ cnt: string | number }>(
+    `
+    SELECT COUNT(*)::int AS cnt
+    FROM weekly_tasks
+    WHERE week_start >= $1::date
+      AND week_start < $2::date
+      AND category_id = 6
+      AND status <> 'done'
+    `,
+    [start, endExclusive]
+  );
+  return asInt(res.rows[0]?.cnt);
+}
+
 async function goalStatusCounts(weekStart: string): Promise<Map<string, number>> {
   const res = await query<CountRow>(
     `
@@ -178,6 +339,20 @@ async function goalStatusCounts(weekStart: string): Promise<Map<string, number>>
     GROUP BY status
     `,
     [weekStart]
+  );
+  return countMap(res.rows);
+}
+
+async function goalStatusCountsInRange(start: string, endExclusive: string): Promise<Map<string, number>> {
+  const res = await query<CountRow>(
+    `
+    SELECT status AS key, COUNT(*)::int AS cnt
+    FROM personal_goals
+    WHERE week_start >= $1::date
+      AND week_start < $2::date
+    GROUP BY status
+    `,
+    [start, endExclusive]
   );
   return countMap(res.rows);
 }
@@ -217,6 +392,43 @@ async function dayPlanCoverage(weekStart: string): Promise<{
   };
 }
 
+async function dayPlanCoverageInRange(start: string, endExclusive: string): Promise<{
+  peopleWithGoals: number;
+  peopleWithPlans: number;
+  coveragePct: number | null;
+}> {
+  const [goalsRes, plansRes] = await Promise.all([
+    query<{ cnt: string | number }>(
+      `
+      SELECT COUNT(DISTINCT TRIM(person_name))::int AS cnt
+      FROM personal_goals
+      WHERE week_start >= $1::date
+        AND week_start < $2::date
+        AND TRIM(person_name) <> ''
+      `,
+      [start, endExclusive]
+    ),
+    query<{ cnt: string | number }>(
+      `
+      SELECT COUNT(DISTINCT TRIM(person_name))::int AS cnt
+      FROM personal_day_plans
+      WHERE week_start >= $1::date
+        AND week_start < $2::date
+        AND TRIM(person_name) <> ''
+      `,
+      [start, endExclusive]
+    )
+  ]);
+
+  const peopleWithGoals = asInt(goalsRes.rows[0]?.cnt);
+  const peopleWithPlans = asInt(plansRes.rows[0]?.cnt);
+  return {
+    peopleWithGoals,
+    peopleWithPlans,
+    coveragePct: peopleWithGoals > 0 ? pct(peopleWithPlans, peopleWithGoals) : null
+  };
+}
+
 async function topDelayedPics(weekStart: string): Promise<DashboardPicStat[]> {
   const res = await query<PicCountRow>(
     `
@@ -238,6 +450,28 @@ async function topDelayedPics(weekStart: string): Promise<DashboardPicStat[]> {
   return res.rows.map((row) => ({ name: row.name, count: asInt(row.cnt) }));
 }
 
+async function topDelayedPicsInRange(start: string, endExclusive: string): Promise<DashboardPicStat[]> {
+  const res = await query<PicCountRow>(
+    `
+    SELECT TRIM(elem->>'name') AS name, COUNT(*)::int AS cnt
+    FROM weekly_tasks t,
+    LATERAL jsonb_array_elements(COALESCE(t.pics, '[]'::jsonb)) AS elem
+    WHERE t.week_start >= $1::date
+      AND t.week_start < $2::date
+      AND (
+        t.kpi IN ('delayed', 'not_achieved')
+        OR (t.category_id = 6 AND t.status <> 'done')
+      )
+      AND NULLIF(TRIM(elem->>'name'), '') IS NOT NULL
+    GROUP BY 1
+    ORDER BY cnt DESC, name ASC
+    LIMIT 8
+    `,
+    [start, endExclusive]
+  );
+  return res.rows.map((row) => ({ name: row.name, count: asInt(row.cnt) }));
+}
+
 async function categoryBreakdown(weekStart: string): Promise<DashboardCategoryStat[]> {
   const res = await query<CategoryRow>(
     `
@@ -253,6 +487,35 @@ async function categoryBreakdown(weekStart: string): Promise<DashboardCategorySt
     ORDER BY c.sort_order ASC
     `,
     [weekStart]
+  );
+  return res.rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    total: asInt(row.total),
+    done: asInt(row.done)
+  }));
+}
+
+async function categoryBreakdownInRange(
+  start: string,
+  endExclusive: string
+): Promise<DashboardCategoryStat[]> {
+  const res = await query<CategoryRow>(
+    `
+    SELECT
+      c.id,
+      c.title,
+      COUNT(t.id)::int AS total,
+      COUNT(*) FILTER (WHERE t.status = 'done')::int AS done
+    FROM task_categories c
+    LEFT JOIN weekly_tasks t
+      ON t.category_id = c.id
+      AND t.week_start >= $1::date
+      AND t.week_start < $2::date
+    GROUP BY c.id, c.title, c.sort_order
+    ORDER BY c.sort_order ASC
+    `,
+    [start, endExclusive]
   );
   return res.rows.map((row) => ({
     id: row.id,
@@ -310,12 +573,90 @@ async function recentActivities(weekStart: string): Promise<DashboardActivity[]>
   }));
 }
 
-async function leaveSnapshot(monthKey: string): Promise<DashboardSummary["leave"]> {
-  const { saturdays, roster, entries } = await listSaturdayLeave(monthKey);
+async function recentActivitiesInRange(
+  start: string,
+  endExclusive: string
+): Promise<DashboardActivity[]> {
+  const res = await query<ActivityRow>(
+    `
+    SELECT kind, id, title, actor, updated_at
+    FROM (
+      SELECT
+        'task'::text AS kind,
+        id,
+        COALESCE(
+          NULLIF(TRIM(item), ''),
+          NULLIF(TRIM(objective), ''),
+          'Task #' || id::text
+        ) AS title,
+        COALESCE(NULLIF(TRIM(created_by), ''), '') AS actor,
+        updated_at
+      FROM weekly_tasks
+      WHERE week_start >= $1::date
+        AND week_start < $2::date
+
+      UNION ALL
+
+      SELECT
+        'goal'::text AS kind,
+        id,
+        COALESCE(NULLIF(TRIM(person_name), ''), 'Nhân sự') || ' · mục tiêu cá nhân' AS title,
+        COALESCE(
+          NULLIF(TRIM(created_by), ''),
+          NULLIF(TRIM(person_name), ''),
+          ''
+        ) AS actor,
+        updated_at
+      FROM personal_goals
+      WHERE week_start >= $1::date
+        AND week_start < $2::date
+    ) u
+    ORDER BY updated_at DESC
+    LIMIT 10
+    `,
+    [start, endExclusive]
+  );
+
+  return res.rows.map((row) => ({
+    id: `${row.kind}-${row.id}`,
+    kind: row.kind === "goal" ? "goal" : "task",
+    title: row.title,
+    actor: row.actor,
+    updatedAt: row.updated_at
+  }));
+}
+
+async function leaveSnapshot(range: PeriodRange): Promise<DashboardSummary["leave"]> {
+  const monthKeys =
+    range.period === "week"
+      ? [toMonthKey(range.start)]
+      : listMonthKeysBetween(range.start, range.endExclusive);
+
+  const months = await Promise.all(monthKeys.map((monthKey) => listSaturdayLeave(monthKey)));
+  const roster = months[0]?.roster ?? [];
+
   const statusByPerson = new Map<string, LeaveStatus | null>();
-  for (const entry of entries) {
-    statusByPerson.set(`${entry.personName}::${entry.workDate}`, entry.status);
+  for (const month of months) {
+    for (const entry of month.entries) {
+      // For week/month: we want the same semantics as calendar month stats.
+      // For quarter/year: we still restrict to the selected time window.
+      if (
+        range.period === "week" ||
+        (entry.workDate >= toIsoDate(range.start) && entry.workDate < toIsoDate(range.endExclusive))
+      ) {
+        statusByPerson.set(`${entry.personName}::${entry.workDate}`, entry.status);
+      }
+    }
   }
+
+  const saturdays =
+    range.period === "week"
+      ? months[0]?.saturdays ?? []
+      : months.flatMap((month) =>
+          month.saturdays.filter(
+            (day) => day >= toIsoDate(range.start) && day < toIsoDate(range.endExclusive)
+          )
+        );
 
   let nearCap = 0;
   let overLimit = 0;
@@ -333,7 +674,12 @@ async function leaveSnapshot(monthKey: string): Promise<DashboardSummary["leave"
   }));
 
   return {
-    month: monthKey,
+    month:
+      range.period === "week"
+        ? formatMonthLabel(range.start)
+        : range.period === "month"
+          ? formatMonthLabel(range.start)
+          : range.label,
     trackedCount: roster.length,
     nearCap,
     overLimit,
@@ -379,11 +725,15 @@ function buildStats(
 
 export async function getDashboardSummary(
   weekRaw: unknown,
+  periodRaw: unknown,
+  refRaw: unknown,
   greetingName: string
 ): Promise<DashboardSummary> {
-  const week = resolveWeekStart(weekRaw);
-  const prevWeekStart = toIsoDate(addDays(week.start, -7));
-  const monthKey = toMonthKey(week.start);
+  const range = resolvePeriodRange(weekRaw, periodRaw, refRaw);
+  const start = toIsoDate(range.start);
+  const endExclusive = toIsoDate(range.endExclusive);
+  const compareStart = toIsoDate(range.compareStart);
+  const compareEndExclusive = toIsoDate(range.compareEndExclusive);
 
   const [
     status,
@@ -397,16 +747,16 @@ export async function getDashboardSummary(
     activities,
     leave
   ] = await Promise.all([
-    taskStatusCounts(week.weekStart),
-    taskKpiCounts(week.weekStart),
-    backlogOpenCount(week.weekStart),
-    taskStatusCounts(prevWeekStart),
-    goalStatusCounts(week.weekStart),
-    dayPlanCoverage(week.weekStart),
-    topDelayedPics(week.weekStart),
-    categoryBreakdown(week.weekStart),
-    recentActivities(week.weekStart),
-    leaveSnapshot(monthKey)
+    taskStatusCountsInRange(start, endExclusive),
+    taskKpiCountsInRange(start, endExclusive),
+    backlogOpenCountInRange(start, endExclusive),
+    taskStatusCountsInRange(compareStart, compareEndExclusive),
+    goalStatusCountsInRange(start, endExclusive),
+    dayPlanCoverageInRange(start, endExclusive),
+    topDelayedPicsInRange(start, endExclusive),
+    categoryBreakdownInRange(start, endExclusive),
+    recentActivitiesInRange(start, endExclusive),
+    leaveSnapshot(range)
   ]);
 
   const prevCompleted = prevStatus.get("done") ?? 0;
@@ -419,8 +769,9 @@ export async function getDashboardSummary(
 
   return {
     greetingName,
-    weekStart: week.weekStart,
-    weekLabel: week.weekLabel || formatWeekLabel(week.start),
+    period: range.period,
+    weekStart: range.weekStart,
+    weekLabel: range.label,
     stats: buildStats(status, kpi, backlogOpen, {
       total: prevTotal,
       donePct: pct(prevCompleted, prevTotal)

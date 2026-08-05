@@ -788,6 +788,8 @@ import {
   getDeadlineUrgency,
   getWeekInfo,
   parseIsoDate,
+  resolvePreferredWeek,
+  setStoredWeekStart,
   type DeadlineUrgency
 } from "@/lib/week";
 import { useAuthStore } from "@/stores/auth";
@@ -833,7 +835,7 @@ const confirm = useConfirm();
 const auth = useAuthStore();
 const canManageAll = computed(() => auth.isDepartmentHead);
 const myPersonName = computed(() => auth.user?.name?.trim() || "");
-const initialWeek = getWeekInfo();
+const initialWeek = resolvePreferredWeek();
 
 const meta = ref<BoardMeta>({
   weekStart: initialWeek.weekStart,
@@ -1751,6 +1753,7 @@ function onWeekRangeUpdate(value: Date | Date[] | (Date | null)[] | null | undef
   }
 
   selectedWeekStart.value = week.weekStart;
+  setStoredWeekStart(week.weekStart);
   void loadBoard(week.weekStart);
 }
 
@@ -1765,6 +1768,7 @@ async function loadBoard(weekStart: string) {
     const week = getWeekInfo(parseIsoDate(data.meta?.weekStart || weekStart) ?? new Date());
     selectedWeekStart.value = week.weekStart;
     weekRange.value = [week.start, week.end];
+    setStoredWeekStart(week.weekStart);
     meta.value = {
       weekStart: week.weekStart,
       weekLabel: data.meta?.weekLabel || week.weekLabel,
@@ -1785,6 +1789,7 @@ async function loadBoard(weekStart: string) {
     const week = getWeekInfo(parseIsoDate(weekStart) ?? new Date());
     selectedWeekStart.value = week.weekStart;
     weekRange.value = [week.start, week.end];
+    setStoredWeekStart(week.weekStart);
     meta.value = {
       weekStart: week.weekStart,
       weekLabel: week.weekLabel,

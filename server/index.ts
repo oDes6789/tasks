@@ -274,7 +274,7 @@ app.get("/api/dashboard/summary", async (req, res) => {
 
   try {
     const greetingName = user.name.split(" ").pop() || user.name;
-    const summary = await getDashboardSummary(req.query.week, greetingName);
+    const summary = await getDashboardSummary(req.query.week, req.query.period, req.query.ref, greetingName);
     res.json(summary);
   } catch (err) {
     console.error("Dashboard summary failed:", err);

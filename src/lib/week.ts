@@ -11,6 +11,8 @@ export interface WeekInfo {
   end: Date;
 }
 
+const SELECTED_WEEK_STORAGE_KEY = "tcgv_selected_week_start";
+
 function atLocalMidnight(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -109,6 +111,33 @@ export function resolveWeekStart(raw: unknown): WeekInfo {
     const parsed = parseIsoDate(raw);
     if (parsed) return getWeekInfo(parsed);
   }
+  return getWeekInfo();
+}
+
+export function getStoredWeekStart(): string | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(SELECTED_WEEK_STORAGE_KEY);
+  if (!raw) return null;
+  return parseIsoDate(raw) ? getWeekInfo(parseIsoDate(raw) ?? new Date()).weekStart : null;
+}
+
+export function setStoredWeekStart(weekStart: string): void {
+  if (typeof window === "undefined") return;
+  const parsed = parseIsoDate(weekStart);
+  if (!parsed) return;
+  window.localStorage.setItem(
+    SELECTED_WEEK_STORAGE_KEY,
+    getWeekInfo(parsed).weekStart
+  );
+}
+
+export function resolvePreferredWeek(raw?: unknown): WeekInfo {
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = parseIsoDate(raw);
+    if (parsed) return getWeekInfo(parsed);
+  }
+  const stored = getStoredWeekStart();
+  if (stored) return getWeekInfo(parseIsoDate(stored) ?? new Date());
   return getWeekInfo();
 }
 

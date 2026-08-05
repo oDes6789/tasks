@@ -493,6 +493,8 @@ import {
   getDeadlineUrgency,
   getWeekInfo,
   parseIsoDate,
+  resolvePreferredWeek,
+  setStoredWeekStart,
   type DeadlineUrgency
 } from "@/lib/week";
 
@@ -543,7 +545,7 @@ const columns = [
 
 const toast = useToast();
 const confirm = useConfirm();
-const initialWeek = getWeekInfo();
+const initialWeek = resolvePreferredWeek();
 
 const meta = ref<BoardMeta>({
   department: "",
@@ -1374,6 +1376,7 @@ function syncWeekRange(weekStart: string) {
   const week = getWeekInfo(parseIsoDate(weekStart) ?? new Date());
   weekRange.value = [week.start, week.end];
   selectedWeekStart.value = week.weekStart;
+  setStoredWeekStart(week.weekStart);
   meta.value = {
     ...meta.value,
     weekStart: week.weekStart,
@@ -1409,6 +1412,7 @@ function onWeekRangeUpdate(value: Date | Date[] | (Date | null)[] | null | undef
   }
 
   selectedWeekStart.value = week.weekStart;
+  setStoredWeekStart(week.weekStart);
   void loadBoard(week.weekStart);
 }
 

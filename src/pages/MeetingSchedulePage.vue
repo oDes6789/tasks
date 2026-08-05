@@ -423,7 +423,14 @@ import {
   type Meeting,
   type Weekday
 } from "@/lib/meetings";
-import { addDays, getWeekInfo, startOfWeek, toIsoDate } from "@/lib/week";
+import {
+  addDays,
+  getWeekInfo,
+  resolvePreferredWeek,
+  setStoredWeekStart,
+  startOfWeek,
+  toIsoDate
+} from "@/lib/week";
 
 const HOUR_START = 8;
 const HOUR_END = 18;
@@ -451,7 +458,7 @@ const owner = MEETING_OWNERS[0];
 const ownerKey = DEFAULT_MEETING_OWNER;
 
 const viewMode = ref<"week" | "list">("week");
-const initialWeek = getWeekInfo();
+const initialWeek = resolvePreferredWeek();
 const weekRange = ref<Date[] | null>([initialWeek.start, initialWeek.end]);
 const meetings = ref<Meeting[]>([]);
 const loading = ref(false);
@@ -598,6 +605,7 @@ function onWeekRangeUpdate(value: Date | Date[] | (Date | null)[] | null | undef
   if (!sameRange) {
     weekRange.value = [week.start, week.end];
   }
+  setStoredWeekStart(week.weekStart);
 }
 
 async function loadWeek() {
@@ -983,6 +991,7 @@ async function deleteMeeting(id: number) {
 watch(
   () => weekInfo.value.weekStart,
   () => {
+    setStoredWeekStart(weekInfo.value.weekStart);
     void loadWeek();
   }
 );

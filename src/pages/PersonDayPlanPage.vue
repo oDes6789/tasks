@@ -288,6 +288,8 @@ import {
   formatDeadlineNote,
   getWeekInfo,
   parseIsoDate,
+  resolvePreferredWeek,
+  setStoredWeekStart,
   toIsoDate
 } from "@/lib/week";
 import { useAuthStore } from "@/stores/auth";
@@ -374,7 +376,7 @@ const router = useRouter();
 const auth = useAuthStore();
 const canSelectPerson = computed(() => auth.canSelectOtherPersonnel);
 const myPersonName = computed(() => auth.user?.name?.trim() || "");
-const initialWeek = getWeekInfo();
+const initialWeek = resolvePreferredWeek();
 const todayIso = toIsoDate(new Date());
 
 const personName = ref(
@@ -637,6 +639,7 @@ function onWeekRangeUpdate(value: Date | Date[] | (Date | null)[] | null | undef
   if (!picked) return;
   const week = getWeekInfo(picked);
   selectedWeekStart.value = week.weekStart;
+  setStoredWeekStart(week.weekStart);
   weekRange.value = [week.start, week.end];
   syncRoute();
   void loadBoard();
@@ -665,6 +668,7 @@ async function loadBoard() {
       items: DayPlanItem[];
     };
     meta.value = board.meta;
+    setStoredWeekStart(board.meta.weekStart);
     personnel.value = board.personnel;
     sources.value = board.sources;
     items.value = board.items.map((it) => ({

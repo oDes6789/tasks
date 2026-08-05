@@ -4,15 +4,100 @@
       <div>
         <h2 class="text-headline-lg text-on-surface">{{ greeting }}, {{ displayName }}</h2>
         <p class="mt-1 text-body-lg text-on-surface-variant">
-          Tổng quan tuần · {{ weekLabel || "…" }}
+          Tổng quan {{ periodLabelLower }} · {{ periodSummaryLabel || "…" }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 rounded-full bg-surface-container-low p-1">
+          <button
+            v-for="option in periodOptions"
+            :key="option.value"
+            type="button"
+            class="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+            :class="
+              selectedPeriod === option.value
+                ? 'bg-primary text-on-primary'
+                : 'text-on-surface-variant hover:bg-surface-container-high'
+            "
+            @click="changePeriod(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 rounded-full bg-white p-1.5">
+          <DatePicker
+            v-if="selectedPeriod === 'week'"
+            v-model="weekRange"
+            selectionMode="range"
+            :manualInput="false"
+            showIcon
+            iconDisplay="input"
+            showWeek
+            showButtonBar
+            hideOnRangeSelection
+            dateFormat="dd/mm/yy"
+            placeholder="Chọn tuần"
+            class="week-datepicker"
+            inputClass="week-datepicker-input"
+            @update:modelValue="onWeekRangeUpdate"
+          />
+
+          <template v-else-if="selectedPeriod === 'month'">
+            <Select
+              v-model="monthYear"
+              :options="yearOptions"
+              optionLabel="label"
+              optionValue="value"
+              class="min-w-[6.5rem]"
+              placeholder="Năm"
+            />
+            <Select
+              v-model="monthNumber"
+              :options="monthOptions"
+              optionLabel="label"
+              optionValue="value"
+              class="min-w-[7rem]"
+              placeholder="Tháng"
+            />
+          </template>
+
+          <template v-else-if="selectedPeriod === 'quarter'">
+            <Select
+              v-model="quarterYear"
+              :options="yearOptions"
+              optionLabel="label"
+              optionValue="value"
+              class="min-w-[6.5rem]"
+              placeholder="Năm"
+            />
+            <Select
+              v-model="quarterNumber"
+              :options="quarterOptions"
+              optionLabel="label"
+              optionValue="value"
+              class="min-w-[7rem]"
+              placeholder="Quý"
+            />
+          </template>
+
+          <template v-else>
+            <Select
+              v-model="yearValue"
+              :options="yearOptions"
+              optionLabel="label"
+              optionValue="value"
+              class="min-w-[7.5rem]"
+              placeholder="Năm"
+            />
+          </template>
+        </div>
+
         <RouterLink
           to="/tasks"
           class="rounded-full bg-secondary-container px-4 py-2 text-label-md text-primary transition-colors hover:bg-primary-fixed"
         >
-          Mục tiêu tuần
+          Mục tiêu
         </RouterLink>
         <RouterLink
           to="/nghi-thu-7"
@@ -111,7 +196,7 @@
           Đang tải…
         </div>
         <div v-else-if="!activities.length" class="text-sm text-on-surface-variant">
-          Chưa có cập nhật nào trong tuần này.
+          Chưa có cập nhật nào trong {{ periodLabelLower }} này.
         </div>
         <div v-else class="space-y-2">
           <div
@@ -155,7 +240,7 @@
         </div>
 
         <div v-if="!topDelayedPics.length" class="text-sm text-on-surface-variant">
-          Không có PIC delayed / tồn đọng tuần này.
+          Không có PIC delayed / tồn đọng trong {{ periodLabelLower }} này.
         </div>
         <div v-else class="space-y-3">
           <div
@@ -172,7 +257,9 @@
 
         <div class="mt-8">
           <div class="rounded-2xl border border-primary/10 bg-primary/5 p-4">
-            <p class="mb-2 text-sm font-medium text-primary">Tiến độ tuần (% Done)</p>
+            <p class="mb-2 text-sm font-medium text-primary">
+              Tiến độ {{ periodLabelLower }} (% Done)
+            </p>
             <div class="h-2 w-full overflow-hidden rounded-full bg-surface-container-high">
               <div
                 class="h-full rounded-full bg-primary transition-all"
@@ -215,11 +302,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
+import DatePicker from "primevue/datepicker";
+import Select from "primevue/select";
 import Icon from "@/components/Icon.vue";
 import { authHeaders } from "@/lib/auth";
 import { useAuthStore } from "@/stores/auth";
+import { getWeekInfo, resolvePreferredWeek, toIsoDate } from "@/lib/week";
+
+type DashboardPeriod = "week" | "month" | "quarter" | "year";
 
 interface DashboardStats {
   totalTasks: number;
@@ -303,7 +395,8 @@ const auth = useAuthStore();
 const loading = ref(true);
 const loadError = ref("");
 const greetingName = ref("");
-const weekLabel = ref("");
+const periodSummaryLabel = ref("");
+const selectedPeriod = ref<DashboardPeriod>("week");
 const stats = ref<DashboardStats>(emptyStats());
 const goals = ref<GoalsSummary>({
   total: 0,
@@ -327,6 +420,69 @@ const leave = ref<LeaveSummary>({
 const activities = ref<Activity[]>([]);
 const topDelayedPics = ref<PicStat[]>([]);
 const categories = ref<CategoryStat[]>([]);
+const periodOptions: { value: DashboardPeriod; label: string }[] = [
+  { value: "week", label: "Tuần" },
+  { value: "month", label: "Tháng" },
+  { value: "quarter", label: "Quý" },
+  { value: "year", label: "Năm" }
+];
+
+const initialWeek = resolvePreferredWeek();
+const refDate = ref<Date>(initialWeek.start);
+
+const weekRange = ref<Date[] | null>([initialWeek.start, initialWeek.end]);
+const selectedWeekInfo = computed(() => getWeekInfo(refDate.value));
+
+const syncing = ref(false);
+
+const now = new Date();
+const YEAR_SPAN = 5;
+const yearOptions = computed(() => {
+  const y0 = now.getFullYear() - YEAR_SPAN;
+  const y1 = now.getFullYear() + YEAR_SPAN;
+  const opts: { label: string; value: number }[] = [];
+  for (let y = y0; y <= y1; y++) opts.push({ label: String(y), value: y });
+  return opts;
+});
+
+const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+  label: `Tháng ${String(i + 1).padStart(2, "0")}`,
+  value: i + 1
+}));
+
+const quarterOptions = Array.from({ length: 4 }, (_, i) => ({
+  label: `Quý ${i + 1}`,
+  value: i + 1
+}));
+
+const monthYear = ref(refDate.value.getFullYear());
+const monthNumber = ref(refDate.value.getMonth() + 1);
+const quarterYear = ref(refDate.value.getFullYear());
+const quarterNumber = ref(Math.floor(refDate.value.getMonth() / 3) + 1);
+const yearValue = ref(refDate.value.getFullYear());
+
+function syncPickerFromRefDate() {
+  syncing.value = true;
+  const d = refDate.value;
+  monthYear.value = d.getFullYear();
+  monthNumber.value = d.getMonth() + 1;
+  quarterYear.value = d.getFullYear();
+  quarterNumber.value = Math.floor(d.getMonth() / 3) + 1;
+  yearValue.value = d.getFullYear();
+  weekRange.value = [selectedWeekInfo.value.start, selectedWeekInfo.value.end];
+  void nextTick(() => {
+    syncing.value = false;
+  });
+}
+
+function onWeekRangeUpdate(value: Date | Date[] | (Date | null)[] | null | undefined) {
+  const picked = Array.isArray(value) ? value.find((d): d is Date => d instanceof Date) : value;
+  if (!picked) return;
+  const week = getWeekInfo(picked);
+  refDate.value = week.start;
+  weekRange.value = [week.start, week.end];
+  void loadDashboard();
+}
 
 const hour = new Date().getHours();
 const greeting = computed(() => {
@@ -340,12 +496,38 @@ const displayName = computed(
 );
 
 const categoriesWithWork = computed(() => categories.value.filter((c) => c.total > 0));
+const periodLabelLower = computed(() => {
+  switch (selectedPeriod.value) {
+    case "month":
+      return "tháng";
+    case "quarter":
+      return "quý";
+    case "year":
+      return "năm";
+    default:
+      return "tuần";
+  }
+});
+
+function previousPeriodLabel(period: DashboardPeriod): string {
+  switch (period) {
+    case "month":
+      return "tháng trước";
+    case "quarter":
+      return "quý trước";
+    case "year":
+      return "năm trước";
+    default:
+      return "tuần trước";
+  }
+}
 
 function formatDelta(value: number | null, suffix = ""): string {
-  if (value == null) return "So với tuần trước: —";
-  if (value === 0) return `Ngang tuần trước${suffix}`;
+  const compareLabel = previousPeriodLabel(selectedPeriod.value);
+  if (value == null) return `So với ${compareLabel}: —`;
+  if (value === 0) return `Ngang ${compareLabel}${suffix}`;
   const sign = value > 0 ? "+" : "";
-  return `${sign}${value}${suffix} so với tuần trước`;
+  return `${sign}${value}${suffix} so với ${compareLabel}`;
 }
 
 const summaryCards = computed(() => {
@@ -361,7 +543,7 @@ const summaryCards = computed(() => {
 
   return [
     {
-      label: "Task tuần",
+      label: `Task ${periodLabelLower.value}`,
       value: s.totalTasks,
       icon: "list_alt",
       iconWrap: "bg-primary-container/10",
@@ -424,11 +606,17 @@ function relativeTime(iso: string): string {
   });
 }
 
-onMounted(async () => {
+async function loadDashboard() {
   loading.value = true;
   loadError.value = "";
   try {
-    const res = await fetch("/api/dashboard/summary", { headers: { ...authHeaders() } });
+    const params = new URLSearchParams({
+      period: selectedPeriod.value,
+      ref: toIsoDate(refDate.value)
+    });
+    const res = await fetch(`/api/dashboard/summary?${params.toString()}`, {
+      headers: { ...authHeaders() }
+    });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       loadError.value = body?.error || "Không tải được dashboard.";
@@ -436,7 +624,7 @@ onMounted(async () => {
     }
     const data = await res.json();
     greetingName.value = data.greetingName ?? "";
-    weekLabel.value = data.weekLabel ?? "";
+    periodSummaryLabel.value = data.weekLabel ?? "";
     stats.value = { ...emptyStats(), ...(data.stats ?? {}) };
     goals.value = {
       total: 0,
@@ -468,5 +656,59 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+}
+
+function changePeriod(period: DashboardPeriod) {
+  if (selectedPeriod.value === period || loading.value) return;
+  selectedPeriod.value = period;
+  syncPickerFromRefDate();
+  void loadDashboard();
+}
+
+onMounted(() => {
+  syncPickerFromRefDate();
+  void loadDashboard();
 });
+
+watch(
+  [monthYear, monthNumber],
+  () => {
+    if (syncing.value) return;
+    if (selectedPeriod.value !== "month") return;
+    refDate.value = new Date(monthYear.value, monthNumber.value - 1, 1);
+    void loadDashboard();
+  },
+  { flush: "post" }
+);
+
+watch(
+  [quarterYear, quarterNumber],
+  () => {
+    if (syncing.value) return;
+    if (selectedPeriod.value !== "quarter") return;
+    const monthIndex = (quarterNumber.value - 1) * 3;
+    refDate.value = new Date(quarterYear.value, monthIndex, 1);
+    void loadDashboard();
+  },
+  { flush: "post" }
+);
+
+watch(
+  yearValue,
+  () => {
+    if (syncing.value) return;
+    if (selectedPeriod.value !== "year") return;
+    refDate.value = new Date(yearValue.value, 0, 1);
+    void loadDashboard();
+  },
+  { flush: "post" }
+);
 </script>
+
+<style scoped>
+.week-datepicker :deep(.p-datepicker-input),
+.week-datepicker-input {
+  min-width: 10rem;
+  font-size: 0.875rem;
+}
+</style>
